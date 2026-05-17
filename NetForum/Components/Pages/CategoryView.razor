@@ -1,0 +1,132 @@
+@page "/category/{Slug}"
+@inject NetForum.Services.IForumService ForumService
+
+@if (category == null)
+{
+    <div class="d-flex justify-content-center my-5">
+        <div class="spinner-border text-primary" role="status" style="color: var(--accent) !important;"></div>
+    </div>
+}
+else
+{
+    <PageTitle>NetForum - @category.Name</PageTitle>
+
+    <div class="premium-card bg-light border-0 mb-4 py-4 px-4" style="background-color: #f8fafc !important; border-radius: 16px;">
+        <h2 class="fw-bold d-flex align-items-center mb-2" style="font-size: 1.75rem;">
+            <i class="bi @category.Icon me-3 text-indigo" style="color: var(--accent);"></i>
+            @category.Name
+        </h2>
+        <p class="text-secondary mb-0" style="font-size: 0.95rem;">@category.Description</p>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold m-0 text-muted" style="font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.5px;">Category Discussions</h4>
+        <div class="btn-group border rounded" role="group" style="padding: 2px; background-color: #f1f5f9;">
+            <button class="btn btn-sm px-3 py-1.5 border-0" 
+                    style="border-radius: 6px; font-weight: 500; transition: background-color 0.15s ease; @(sortBy == "latest" ? "background-color: var(--bg-card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.05);" : "color: var(--text-secondary); background: none;")" 
+                    @onclick='() => ChangeSort("latest")'>Latest</button>
+            <button class="btn btn-sm px-3 py-1.5 border-0" 
+                    style="border-radius: 6px; font-weight: 500; transition: background-color 0.15s ease; @(sortBy == "top" ? "background-color: var(--bg-card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.05);" : "color: var(--text-secondary); background: none;")" 
+                    @onclick='() => ChangeSort("top")'>Top Voted</button>
+        </div>
+    </div>
+
+    @if (threads == null)
+    {
+        <div class="d-flex justify-content-center my-3">
+            <div class="spinner-border text-secondary" role="status" style="color: var(--accent) !important;"></div>
+        </div>
+    }
+    else if (!threads.Any())
+    {
+        <div class="premium-card text-center py-5">
+            <i class="bi bi-card-text text-muted display-4 d-block mb-3"></i>
+            <h5 class="fw-semibold">No posts in this category yet</h5>
+            <p class="text-secondary mb-0">Start a thread and get the conversation flowing!</p>
+        </div>
+    }
+    else
+    {
+        @foreach (var t in threads)
+        {
+            <div class="premium-card d-flex align-items-start gap-3">
+                <div class="d-flex flex-column align-items-center rounded p-1" style="background-color: #f8fafc; border: 1px solid var(--border-color); min-width: 44px;">
+                    <button class="upvote-btn mb-1 text-center justify-content-center w-100" @onclick="() => UpvoteThread(t.Id)">
+                        <i class="bi bi-caret-up-fill"></i>
+                    </button>
+                    <span class="fw-bold text-dark" style="font-size: 0.95rem;">@t.Upvotes</span>
+                </div>
+
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-2 mb-1.5">
+                        <span class="text-muted small">Posted by @t.AuthorName • @GetTimeAgo(t.CreatedAt)</span>
+                    </div>
+                    <h4 class="fw-bold h5 mb-1.5">
+                        <a href="/thread/@t.Id" class="text-decoration-none text-dark" style="transition: color 0.15s ease;">@t.Title</a>
+                    </h4>
+                    <p class="text-secondary small mb-0 text-truncate" style="max-width: 600px;">@t.Content</p>
+                </div>
+
+                <div class="d-flex align-items-center gap-1.5 text-muted small px-3 py-2 rounded" style="background-color: #f8fafc; border: 1px solid var(--border-color); font-weight: 500;">
+                    <i class="bi bi-chat-left-dots-fill" style="color: var(--accent);"></i>
+                    <span>@(t.Posts?.Count ?? 0) replies</span>
+                </div>
+            </div>
+        }
+    }
+}
+
+@code {
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+
+    private NetForum.Data.Entities.Category? category;
+    private List<NetForum.Data.Entities.Thread>? threads;
+    private string sortBy = "latest";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        category = await ForumService.GetCategoryBySlugAsync(Slug);
+        if (category != null)
+        {
+            await LoadThreads();
+        }
+    }
+
+    private async Task LoadThreads()
+    {
+        if (category == null) return;
+        threads = await ForumService.GetThreadsAsync(category.Id);
+        ApplySorting();
+    }
+
+    private void ApplySorting()
+    {
+        if (threads == null) return;
+        if (sortBy == "latest")
+            threads = threads.OrderByDescending(t => t.CreatedAt).ToList();
+        else
+            threads = threads.OrderByDescending(t => t.Upvotes).ToList();
+    }
+
+    private void ChangeSort(string mode)
+    {
+        sortBy = mode;
+        ApplySorting();
+    }
+
+    private async Task UpvoteThread(Guid threadId)
+    {
+        await ForumService.UpvoteThreadAsync(threadId);
+        await LoadThreads();
+    }
+
+    private string GetTimeAgo(DateTimeOffset created)
+    {
+        var diff = DateTimeOffset.UtcNow - created;
+        if (diff.TotalDays >= 1) return $"{(int)diff.TotalDays}d ago";
+        if (diff.TotalHours >= 1) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalMinutes >= 1) return $"{(int)diff.TotalMinutes}m ago";
+        return "just now";
+    }
+}

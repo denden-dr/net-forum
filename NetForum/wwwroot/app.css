@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --accent: #4f46e5;
+    --accent-hover: #4338ca;
+    --border-color: #e2e8f0;
+    --success: #10b981;
+    --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    margin: 0;
+    padding: 0;
+}
+
+/* Premium card hover effects */
+.premium-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: var(--card-shadow);
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.premium-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.05);
+    transform: translateY(-2px);
+}
+
+/* Interactive Upvote micro-animations */
+.upvote-btn {
+    transition: transform 0.15s ease, color 0.15s ease;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+}
+.upvote-btn:hover {
+    transform: scale(1.1);
+    color: var(--accent);
+    background-color: #f1f5f9;
+}
+.upvote-btn.active {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Glassmorphic sticky header nav bar */
+.nav-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Markdown Quote adjustments for chronological comments */
+blockquote {
+    border-left: 4px solid var(--accent);
+    background-color: var(--bg-primary);
+    padding: 0.75rem 1rem;
+    margin: 0.75rem 0;
+    border-radius: 0 8px 8px 0;
+    color: var(--text-secondary);
+    font-size: 0.925rem;
+}
+blockquote p {
+    margin: 0;
+}
+
+/* Sidebar navigation styles */
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    color: var(--text-primary);
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.sidebar-link:hover, .sidebar-link.active {
+    background-color: #f1f5f9;
+    color: var(--accent);
+}
+.sidebar-link i {
+    font-size: 1.15rem;
+    color: var(--text-secondary);
+}
+.sidebar-link:hover i, .sidebar-link.active i {
+    color: var(--accent);
+}

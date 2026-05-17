@@ -1,0 +1,210 @@
+@page "/thread/{ThreadId:guid}"
+@inject NetForum.Services.IForumService ForumService
+
+@if (thread == null)
+{
+    <div class="d-flex justify-content-center my-5">
+        <div class="spinner-border text-primary" role="status" style="color: var(--accent) !important;"></div>
+    </div>
+}
+else
+{
+    <PageTitle>NetForum - @thread.Title</PageTitle>
+
+    <div class="premium-card border-bottom-0 pb-4 mb-0 shadow-sm" style="border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px solid var(--border-color) !important;">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <span class="badge text-white px-2.5 py-1.5" style="background-color: var(--accent); border-radius: 6px; font-size: 0.75rem;">@thread.Category?.Name</span>
+            <span class="text-muted small">Started by @thread.AuthorName • @GetTimeAgo(thread.CreatedAt)</span>
+        </div>
+
+        <h2 class="fw-bold mb-3" style="font-size: 1.85rem; line-height: 1.3;">@thread.Title</h2>
+        
+        <div class="fs-6 text-dark mb-4" style="line-height: 1.6; white-space: pre-wrap;">
+            @thread.Content
+        </div>
+
+        <div class="d-flex gap-4 border-top pt-3 text-muted small" style="border-top: 1px solid var(--border-color) !important; font-weight: 500;">
+            <button class="upvote-btn d-flex align-items-center gap-1.5" @onclick="UpvoteMainThread">
+                <i class="bi bi-caret-up-fill" style="font-size: 1.25rem;"></i>
+                <span class="fw-bold text-dark">@thread.Upvotes upvotes</span>
+            </button>
+            <span class="d-flex align-items-center gap-1.5 py-1">
+                <i class="bi bi-eye-fill" style="color: var(--text-secondary); font-size: 1.1rem;"></i>
+                <span>@thread.Views views</span>
+            </span>
+        </div>
+    </div>
+
+    <div class="p-3 border border-top-0 mb-4 shadow-sm" style="background-color: #f8fafc; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; border-top: 0 !important;">
+        <h5 class="fw-bold mb-3 px-2" style="font-size: 1.05rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.5px;">Replies (@(posts?.Count ?? 0))</h5>
+
+        @if (posts == null)
+        {
+            <div class="d-flex justify-content-center my-3">
+                <div class="spinner-border spinner-border-sm text-secondary" role="status" style="color: var(--accent) !important;"></div>
+            </div>
+        }
+        else if (!posts.Any())
+        {
+            <div class="text-center py-4 text-muted small" style="font-weight: 500;">
+                No replies yet. Start the conversation by writing a reply below!
+            </div>
+        }
+        else
+        {
+            @foreach (var post in posts)
+            {
+                <div class="bg-white p-3 border rounded-3 mb-3 shadow-sm" style="border-radius: 12px !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-semibold small text-dark">
+                            @post.AuthorName 
+                            <span class="text-muted fw-normal">• @GetTimeAgo(post.CreatedAt)</span>
+                        </span>
+                        <div class="d-flex gap-2.5">
+                            <button class="btn btn-link btn-sm text-decoration-none p-0 text-muted d-flex align-items-center gap-1 small" @onclick="() => SetReplyQuote(post)" style="box-shadow: none; font-weight: 500;">
+                                <i class="bi bi-quote" style="font-size: 1rem; color: var(--accent);"></i> Reply
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (post.ReplyToPost != null)
+                    {
+                        <div class="border-start border-4 bg-light p-2 mb-2 small text-secondary rounded" style="border-left-color: var(--accent) !important; border-left-width: 4px !important; background-color: #f8fafc !important;">
+                            <strong>Replying to @post.ReplyToPost.AuthorName:</strong>
+                            <div class="text-truncate" style="max-width: 500px;">@post.ReplyToPost.Content</div>
+                        </div>
+                    }
+
+                    <div class="small text-dark mb-2.5" style="white-space: pre-wrap; line-height: 1.5;">@post.Content</div>
+
+                    <div class="d-flex align-items-center gap-1.5 text-muted small">
+                        <button class="upvote-btn btn-sm py-0 px-2" @onclick="() => UpvotePost(post.Id)">
+                            <i class="bi bi-caret-up-fill"></i>
+                        </button>
+                        <span class="fw-semibold text-dark">@post.Upvotes votes</span>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <div class="premium-card">
+        <h4 class="fw-bold h5 mb-3" style="font-size: 1.15rem;">Post a Reply</h4>
+        
+        @if (activeQuoteAuthor != null)
+        {
+            <div class="alert d-flex justify-content-between align-items-center py-2 px-3 mb-3 small" style="background: #e0e7ff; color: #4338ca; border: 0; border-radius: 8px; font-weight: 500;">
+                <span>Replying to <strong>@@@activeQuoteAuthor</strong></span>
+                <button type="button" class="btn-close" style="font-size: 0.75rem; box-shadow: none;" @onclick="CancelQuote"></button>
+            </div>
+        }
+
+        <div class="mb-3 row">
+            <div class="col-md-6">
+                <label class="form-label text-secondary fw-semibold small">Your Name</label>
+                <input type="text" class="form-control py-2" placeholder="Anonymous" @bind="replyAuthor" style="border-radius: 8px; box-shadow: none;" />
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label text-secondary fw-semibold small">Message Content</label>
+            <textarea class="form-control py-2" rows="4" placeholder="Write your thoughts here..." @bind="replyContent" style="border-radius: 8px; box-shadow: none;"></textarea>
+        </div>
+
+        <div class="text-end">
+            <button class="btn text-white px-4 py-2" style="background-color: var(--accent); border-radius: 8px; font-weight: 500;" @onclick="SubmitReply">
+                Post Reply
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid ThreadId { get; set; }
+
+    private NetForum.Data.Entities.Thread? thread;
+    private List<NetForum.Data.Entities.Post>? posts;
+
+    private string replyAuthor = "";
+    private string replyContent = "";
+    private Guid? replyToPostId;
+    private string? activeQuoteAuthor;
+
+    protected override async Task OnInitializedAsync()
+    {
+        thread = await ForumService.GetThreadByIdAsync(ThreadId, incrementViewCount: true);
+        if (thread != null)
+        {
+            await LoadPosts();
+        }
+    }
+
+    private async Task LoadPosts()
+    {
+        posts = await ForumService.GetPostsForThreadAsync(ThreadId);
+    }
+
+    private async Task UpvoteMainThread()
+    {
+        if (thread == null) return;
+        await ForumService.UpvoteThreadAsync(thread.Id);
+        thread.Upvotes++;
+    }
+
+    private async Task UpvotePost(Guid postId)
+    {
+        await ForumService.UpvotePostAsync(postId);
+        await LoadPosts();
+    }
+
+    private void SetReplyQuote(NetForum.Data.Entities.Post targetPost)
+    {
+        replyToPostId = targetPost.Id;
+        activeQuoteAuthor = targetPost.AuthorName;
+        
+        var cleanContent = targetPost.Content.Length > 80 
+            ? targetPost.Content.Substring(0, 80) + "..." 
+            : targetPost.Content;
+
+        // Strip previous quote blocks to avoid infinite nested quotes inside input textarea
+        if (cleanContent.StartsWith(">"))
+        {
+            var lines = cleanContent.Split('\n');
+            cleanContent = string.Join(" ", lines.Where(l => !l.StartsWith(">")).Select(l => l.Trim()));
+            if (cleanContent.Length > 80)
+            {
+                cleanContent = cleanContent.Substring(0, 80) + "...";
+            }
+        }
+
+        replyContent = $"> @{targetPost.AuthorName} said: \"{cleanContent}\"\n\n" + replyContent;
+    }
+
+    private void CancelQuote()
+    {
+        replyToPostId = null;
+        activeQuoteAuthor = null;
+    }
+
+    private async Task SubmitReply()
+    {
+        if (string.IsNullOrWhiteSpace(replyContent)) return;
+
+        await ForumService.CreatePostAsync(ThreadId, replyContent, replyAuthor, replyToPostId);
+        replyContent = "";
+        replyAuthor = "";
+        replyToPostId = null;
+        activeQuoteAuthor = null;
+        await LoadPosts();
+    }
+
+    private string GetTimeAgo(DateTimeOffset created)
+    {
+        var diff = DateTimeOffset.UtcNow - created;
+        if (diff.TotalDays >= 1) return $"{(int)diff.TotalDays}d ago";
+        if (diff.TotalHours >= 1) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalMinutes >= 1) return $"{(int)diff.TotalMinutes}m ago";
+        return "just now";
+    }
+}

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="NetForum.Tests/NetForum.Tests.csproj" />
+  <Project Path="NetForum/NetForum.csproj" />
+</Solution>

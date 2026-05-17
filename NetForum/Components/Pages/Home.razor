@@ -1,0 +1,198 @@
+@page "/"
+@inject NetForum.Services.IForumService ForumService
+@inject NavigationManager Nav
+
+<PageTitle>NetForum - All Discussions</PageTitle>
+
+@if (isNewThreadModalOpen)
+{
+    <div class="modal fade show d-block" style="background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(4px);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-3 border-0" style="border-radius: 16px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold fs-5">Start a New Discussion</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal" style="box-shadow: none;"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-semibold small">Discussion Category</label>
+                        <select class="form-select py-2" @bind="newCategoryId" style="border-radius: 8px; box-shadow: none;">
+                            @if (categories != null)
+                            {
+                                @foreach (var c in categories)
+                                {
+                                    <option value="@c.Id">@c.Name</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-semibold small">Your Name</label>
+                        <input type="text" class="form-control py-2" placeholder="Anonymous" @bind="newAuthor" style="border-radius: 8px; box-shadow: none;" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-semibold small">Discussion Title</label>
+                        <input type="text" class="form-control py-2" placeholder="What is this about?" @bind="newTitle" style="border-radius: 8px; box-shadow: none;" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-semibold small">Discussion Content</label>
+                        <textarea class="form-control py-2" rows="5" placeholder="Write details here (markdown supported)..." @bind="newContent" style="border-radius: 8px; box-shadow: none;"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button class="btn btn-light px-4 py-2" style="border-radius: 8px; font-weight: 500;" @onclick="CloseModal">Cancel</button>
+                    <button class="btn text-white px-4 py-2" style="background-color: var(--accent); border-radius: 8px; font-weight: 500;" @onclick="SubmitThread">Create Discussion</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold m-0" style="font-size: 1.75rem;">All Discussions</h2>
+    <div class="btn-group border rounded" role="group" style="padding: 2px; background-color: #f1f5f9;">
+        <button class="btn btn-sm px-3 py-1.5 border-0" 
+                style="border-radius: 6px; font-weight: 500; transition: background-color 0.15s ease; @(sortBy == "latest" ? "background-color: var(--bg-card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.05);" : "color: var(--text-secondary); background: none;")" 
+                @onclick='() => ChangeSort("latest")'>Latest</button>
+        <button class="btn btn-sm px-3 py-1.5 border-0" 
+                style="border-radius: 6px; font-weight: 500; transition: background-color 0.15s ease; @(sortBy == "top" ? "background-color: var(--bg-card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.05);" : "color: var(--text-secondary); background: none;")" 
+                @onclick='() => ChangeSort("top")'>Top Voted</button>
+    </div>
+</div>
+
+@if (threads == null)
+{
+    <div class="d-flex justify-content-center my-5">
+        <div class="spinner-border text-primary" role="status" style="color: var(--accent) !important;"></div>
+    </div>
+}
+else if (!threads.Any())
+{
+    <div class="premium-card text-center py-5">
+        <i class="bi bi-chat-square-dots text-muted display-4 d-block mb-3"></i>
+        <h4 class="fw-bold">No discussions found</h4>
+        <p class="text-secondary mb-0">Be the first to start a discussion or adjust your search filter!</p>
+    </div>
+}
+else
+{
+    @foreach (var t in threads)
+    {
+        <div class="premium-card d-flex align-items-start gap-3">
+            <div class="d-flex flex-column align-items-center rounded p-1" style="background-color: #f8fafc; border: 1px solid var(--border-color); min-width: 44px;">
+                <button class="upvote-btn mb-1 text-center justify-content-center w-100" @onclick="() => UpvoteThread(t.Id)">
+                    <i class="bi bi-caret-up-fill"></i>
+                </button>
+                <span class="fw-bold text-dark" style="font-size: 0.95rem;">@t.Upvotes</span>
+            </div>
+
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 mb-1.5">
+                    <span class="badge text-white px-2.5 py-1.5" style="background-color: var(--accent); border-radius: 6px; font-size: 0.75rem;">@t.Category?.Name</span>
+                    <span class="text-muted small">• Posted by @t.AuthorName • @GetTimeAgo(t.CreatedAt)</span>
+                </div>
+                <h4 class="fw-bold h5 mb-1.5">
+                    <a href="/thread/@t.Id" class="text-decoration-none text-dark" style="transition: color 0.15s ease;">@t.Title</a>
+                </h4>
+                <p class="text-secondary small mb-0 text-truncate" style="max-width: 600px;">@t.Content</p>
+            </div>
+
+            <div class="d-flex align-items-center gap-1.5 text-muted small px-3 py-2 rounded" style="background-color: #f8fafc; border: 1px solid var(--border-color); font-weight: 500;">
+                <i class="bi bi-chat-left-dots-fill" style="color: var(--accent);"></i>
+                <span>@(t.Posts?.Count ?? 0) replies</span>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? SearchQuery { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "newthread")]
+    public bool? ShowNewThread { get; set; }
+
+    private List<NetForum.Data.Entities.Thread>? threads;
+    private List<NetForum.Data.Entities.Category>? categories;
+    private string sortBy = "latest";
+
+    private bool isNewThreadModalOpen = false;
+    private int newCategoryId = 1;
+    private string newAuthor = "";
+    private string newTitle = "";
+    private string newContent = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await ForumService.GetCategoriesAsync();
+        if (categories != null && categories.Any())
+        {
+            newCategoryId = categories.First().Id;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadThreads();
+        if (ShowNewThread == true)
+        {
+            isNewThreadModalOpen = true;
+        }
+    }
+
+    private async Task LoadThreads()
+    {
+        threads = await ForumService.GetThreadsAsync(null, SearchQuery);
+        ApplySorting();
+    }
+
+    private void ApplySorting()
+    {
+        if (threads == null) return;
+        if (sortBy == "latest")
+            threads = threads.OrderByDescending(t => t.CreatedAt).ToList();
+        else
+            threads = threads.OrderByDescending(t => t.Upvotes).ToList();
+    }
+
+    private void ChangeSort(string mode)
+    {
+        sortBy = mode;
+        ApplySorting();
+    }
+
+    private async Task UpvoteThread(Guid threadId)
+    {
+        await ForumService.UpvoteThreadAsync(threadId);
+        await LoadThreads();
+    }
+
+    private void CloseModal()
+    {
+        isNewThreadModalOpen = false;
+        Nav.NavigateTo("/");
+    }
+
+    private async Task SubmitThread()
+    {
+        if (string.IsNullOrWhiteSpace(newTitle) || string.IsNullOrWhiteSpace(newContent)) return;
+
+        var created = await ForumService.CreateThreadAsync(newCategoryId, newTitle, newContent, newAuthor);
+        isNewThreadModalOpen = false;
+        newTitle = "";
+        newContent = "";
+        newAuthor = "";
+        Nav.NavigateTo($"/thread/{created.Id}");
+    }
+
+    private string GetTimeAgo(DateTimeOffset created)
+    {
+        var diff = DateTimeOffset.UtcNow - created;
+        if (diff.TotalDays >= 1) return $"{(int)diff.TotalDays}d ago";
+        if (diff.TotalHours >= 1) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalMinutes >= 1) return $"{(int)diff.TotalMinutes}m ago";
+        return "just now";
+    }
+}

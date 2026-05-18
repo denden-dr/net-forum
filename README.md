@@ -34,13 +34,17 @@ net-forum/                       # Repository Root
 │   ├── App.razor                # Primary HTML host & script loader
 │   ├── Data/
 │   │   ├── AppDbContext.cs      # EF Core DbContext, entity bindings, and seed data
-│   │   ├── Entities/            # Relational database models (Category, Thread, Post)
+│   │   ├── Entities/            # Relational database models (Category, Thread, Post, Notification)
 │   │   └── Repositories/        # Persistence Abstraction (Repository Pattern)
 │   │       ├── IForumRepository.cs # Data access interface contract
-│   │       └── ForumRepository.cs  # Optimized thread-safe EF queries (Primary Constructor)
+│   │       ├── ForumRepository.cs  # Optimized thread-safe EF queries (Primary Constructor)
+│   │       ├── INotificationRepository.cs # Data access interface contract for notifications
+│   │       └── NotificationRepository.cs  # Database queries for notification logs
 │   ├── Services/
 │   │   ├── IForumService.cs     # Forum operations interface contract
-│   │   └── ForumService.cs      # Pure business logic, trimming, and sanitizations
+│   │   ├── ForumService.cs      # Pure business logic, trimming, and sanitizations
+│   │   ├── INotificationService.cs # Notification operations interface contract
+│   │   └── NotificationService.cs  # Mentions parsing and non-blocking notification delivery
 │   └── wwwroot/
 │       └── app.css              # Custom Vanilla Light variables and layout rules
 └── NetForum.Tests/              # Developer Automated Testing Suite
@@ -105,3 +109,4 @@ Open **`http://localhost:5201`** in your browser to experience the forum!
 6. **Cascading Upvote System:** C# state mutations for threads and replies with instant reactive UI increments.
 7. **Quoted Comment Threading:** Linear comment timelines supporting self-referencing parent quotations.
 8. **Instant Keyword Filtering:** Fast case-insensitive search matching Thread Title and Content.
+9. **Asynchronous User Notifications & @Mentions:** Fire-and-forget background worker execution to parse usernames and notify recipients on thread replies, quotations, and active mentions without blocking the UI rendering cycle.

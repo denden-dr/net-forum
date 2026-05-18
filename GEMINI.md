@@ -19,6 +19,9 @@ This file contains strict instructions, developer shortcuts, and context rules f
     *   Powered by **ASP.NET Core Identity** mapped to local PostgreSQL tables.
     *   Active user context (Id, Username, Role, and Authentication State) must be resolved implicitly via the **`ICurrentUserService`** service interface.
     *   Local development fallbacks are provided dynamically via `DevCurrentUserService` pointing to a seeded developer profile (`00000000-0000-0000-0000-000000000001`).
+*   **Notification & Mention System:**
+    *   Driven by `INotificationService` and `INotificationRepository` mapped to local PostgreSQL databases.
+    *   To keep SignalR Blazor Server circuit rendering sub-millisecond, all mentions parsing and notification triggers (threads/quote replies) MUST be dispatched on non-blocking fire-and-forget background worker threads (`Task.Run`).
 *   **UI System (Vanilla Light Mode):**
     *   Minimalist, professional, high-contrast Light Mode theme.
     *   *Variables:* `--bg-primary: #f8fafc;`, `--bg-card: #ffffff;`, `--text-primary: #0f172a;`, `--accent: #4f46e5;` (Indigo).

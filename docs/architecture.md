@@ -42,14 +42,18 @@ graph TD
 
 ## 🗄️ PostgreSQL Database Entity Schema
 
-The database consists of four relational entities integrated under Entity Framework Core with Identity framework mappings, automatic cascading deletes, and unique indexes:
+The database consists of five relational entities integrated under Entity Framework Core with Identity framework mappings, automatic cascading deletes, and unique indexes:
 
 ```mermaid
 erDiagram
     User ||--o{ Thread : "creates"
     User ||--o{ Post : "writes"
+    User ||--o{ Notification : "receives"
+    User ||--o{ Notification : "triggers"
     Category ||--o{ Thread : "has many"
     Thread ||--o{ Post : "has many"
+    Thread ||--o{ Notification : "associated with"
+    Post ||--o{ Notification : "associated with"
     Post |o--o| Post : "replies to (parent)"
 ```
 
@@ -92,6 +96,27 @@ Represents comments or replies within a thread.
 * **`Content`** (`string`): Body comment (includes quotation rendering blocks).
 * **`CreatedAt`** (`DateTimeOffset`): Chronological stamp.
 * **`Upvotes`** (`int`): Heart count.
+
+### 5. `Notification`
+Represents user notifications for mentions, replies, and quoted responses.
+* **`Id`** (`Guid`, PK): Unique notification identifier.
+* **`RecipientId`** (`Guid`, FK): Relates to the notified `User` (Cascade Deletes enabled).
+* **`SenderId`** (`Guid`, FK): Relates to the `User` triggering the action (Cascade Deletes enabled).
+* **`ThreadId`** (`Guid`, FK): Direct connection to the relevant `Thread` (Cascade Deletes enabled).
+* **`PostId`** (`Guid?`, FK): Optional connection to the relevant comment `Post` (Cascade Deletes enabled).
+* **`ContentPreview`** (`string`): Trimmed snippet summarizing the notification trigger (max 255 chars).
+* **`IsRead`** (`bool`): Direct tracking of read status (defaults to `false`).
+* **`CreatedAt`** (`DateTimeOffset`): Chronological stamp.
+
+---
+
+## ⚡ Non-Blocking Notification Architecture
+
+To protect user interaction responsiveness and eliminate rendering latency during post or thread publishing, NetForum implements a **non-blocking background notification processing** pattern inside `ForumService.cs`:
+
+* **Asynchronous Execution (`Task.Run`)**: When a thread or post is saved, the service instantly commits the entity to PostgreSQL, updates caches, and immediately returns the result to the rendering thread.
+* **Fire-and-Forget mentions parsing**: The operations to parse `@username` mentions, quote dependencies, and thread ownership matches are dispatched to background worker tasks (`Task.Run(async () => { ... })`).
+* **Safe Error Handling**: Dispatched tasks are wrapped in robust try-catch blocks to safely swallow run exceptions, preventing background threading failures from crashing active SignalR user web circuits.
 
 ---
 

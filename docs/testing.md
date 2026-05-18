@@ -19,6 +19,7 @@ To optimize speed and correctness, NetForum splits tests into two distinct direc
 
 ### 1. Unit Tests (`NetForum.Tests/Unit/`)
 * **`ForumServiceUnitTests.cs`**: Focuses on validating functional business logic operations in the service layer (e.g. upvoting boundaries, casing slug formatting, write blocks for unconfirmed email users, and active session checking). Tests utilize **Moq** to mock both `IForumRepository` and `ICurrentUserService` to completely isolate the service from the database.
+* **`NotificationServiceUnitTests.cs`**: Validates notification logic, including unread count aggregations, bulk marking as read, and mention parsing behavior using mocked contexts.
 * **`IdentityUnitTests.cs`**: Focuses on validating user default property states (e.g. role defaults to `Roles.Member` and `EmailConfirmed = false`) and the thread-safe unauthenticated session fallback mapping rules within `DevCurrentUserService`.
 * **`HomeComponentTests.cs`**: Tests UI layout, state transitions, and HTML component hierarchies using **bUnit**. Mocks the `IForumService` interface to avoid executing any database code, yielding sub-millisecond execution times.
 * **To run only Unit Tests:** Execute the fast RAM-only target:
@@ -29,6 +30,7 @@ To optimize speed and correctness, NetForum splits tests into two distinct direc
 
 ### 2. Integration Tests (`NetForum.Tests/Integration/`)
 * **`ForumServiceIntegrationTests.cs`**: Verifies full database entity interactions, Npgsql driver configurations, cascading database deletes, and transactional unit of work patterns using `ForumRepository` integrated against real PostgreSQL containers.
+* **`NotificationServiceIntegrationTests.cs`**: Verifies full integration of the notification system with the persistent PostgreSQL container, including bulk updates and cascades.
 * **`IdentityIntegrationTests.cs`**: Integrates the database context with ASP.NET Core Identity's dynamic `UserManager<User>` and cryptographic data protection provider to test user creation, registration flows, unique email constraints, and advanced verification security link lifecycle scenarios (such as token invalidation on regeneration and token lifespan expiration).
 * **Authentication Context Simulation:** Utilizes `SetCurrentUserAsync(string username, bool emailConfirmed = true)` inside integration tests to dynamically register and sign in custom integration test users, validating full relational safety.
 * **`TestcontainersVerificationTests.cs`**: Confirms that EF Core PostgreSQL migration histories match the target server, checks startup latency, and verifies default seed categories exist.

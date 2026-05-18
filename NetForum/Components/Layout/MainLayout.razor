@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @inject NavigationManager Nav
 @inject Services.ICurrentUserService CurrentUserService
 
@@ -10,54 +11,105 @@
         </a>
     </div>
 
-    <div class="d-flex align-items-center w-50">
-        <div class="input-group">
-            <span class="input-group-text bg-white border-end-0" style="border-radius: 8px 0 0 8px;">
-                <i class="bi bi-search text-muted"></i>
-            </span>
-            <input type="text" class="form-control border-start-0 py-2"
-                   placeholder="Search discussions..."
-                   style="border-radius: 0 8px 8px 0; outline: none; box-shadow: none;"
-                   @bind="_searchQuery"
-                   @bind:event="oninput"
-                   @onkeyup="HandleSearchKeyUp"/>
-        </div>
-    </div>
-
-    <div class="d-flex align-items-center gap-3">
-        @if (CurrentUserService.IsAuthenticated && CurrentUserService.Username != "DevUser")
-        {
-            <div class="d-flex align-items-center gap-2">
-                <span class="small fw-semibold text-secondary">Hi, @CurrentUserService.Username!</span>
-                <a href="/api/auth/logout" class="btn btn-link text-decoration-none text-muted p-0 small fw-medium" style="box-shadow: none;">Log Out</a>
+    @if (!IsAuthPage())
+    {
+        <div class="d-flex align-items-center w-50">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0" style="border-radius: 8px 0 0 8px;">
+                    <i class="bi bi-search text-muted"></i>
+                </span>
+                <input type="text" class="form-control border-start-0 py-2"
+                       placeholder="Search discussions..."
+                       style="border-radius: 0 8px 8px 0; outline: none; box-shadow: none;"
+                       @bind="_searchQuery"
+                       @bind:event="oninput"
+                       @onkeyup="HandleSearchKeyUp"/>
             </div>
-        }
-        else
-        {
-            <a href="/login" class="text-decoration-none fw-semibold small px-3 py-2 text-secondary" style="border-radius: 8px; border: 1px solid var(--border-color);">Log In</a>
-            <a href="/register" class="text-white text-decoration-none fw-semibold small px-3 py-2" style="background-color: var(--accent); border-radius: 8px;">Sign Up</a>
-        }
-        <button class="btn text-white px-4 py-2" style="background-color: var(--accent); border-radius: 8px; font-weight: 500;" @onclick="NavigateToNewThread">
-            <i class="bi bi-plus-lg me-1"></i> New Thread
-        </button>
-    </div>
+        </div>
+    }
+
+    @if (!IsAuthPage())
+    {
+        <div class="d-flex align-items-center gap-3">
+            @if (CurrentUserService.IsAuthenticated && CurrentUserService.Username != "DevUser")
+            {
+                <div class="d-flex align-items-center gap-2">
+                    <span class="small fw-semibold text-secondary">Hi, @CurrentUserService.Username!</span>
+                    <a href="/api/auth/logout" class="btn btn-link text-decoration-none text-muted p-0 small fw-medium" style="box-shadow: none;">Log Out</a>
+                </div>
+            }
+            else
+            {
+                <a href="/login" class="text-decoration-none fw-semibold small px-3 py-2 text-secondary" style="border-radius: 8px; border: 1px solid var(--border-color);">Log In</a>
+                <a href="/register" class="text-white text-decoration-none fw-semibold small px-3 py-2" style="background-color: var(--accent); border-radius: 8px;">Sign Up</a>
+            }
+            <button class="btn text-white px-4 py-2" style="background-color: var(--accent); border-radius: 8px; font-weight: 500;" @onclick="NavigateToNewThread">
+                <i class="bi bi-plus-lg me-1"></i> New Thread
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center">
+            <a href="/" class="text-decoration-none fw-semibold small px-3 py-2 text-secondary d-flex align-items-center gap-1" style="border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-card); transition: all 0.2s ease;">
+                <i class="bi bi-arrow-left"></i> Back to Home
+            </a>
+        </div>
+    }
 </div>
 
 <div class="container py-4">
     <div class="row">
-        <div class="col-lg-3 col-md-4 mb-4">
-            <div class="premium-card p-3">
-                <NavMenu/>
+        @if (!IsAuthPage())
+        {
+            <div class="col-lg-3 col-md-4 mb-4">
+                <div class="premium-card p-3">
+                    <NavMenu/>
+                </div>
             </div>
-        </div>
-        <div class="col-lg-9 col-md-8">
-            @Body
-        </div>
+            <div class="col-lg-9 col-md-8">
+                @Body
+            </div>
+        }
+        else
+        {
+            <div class="col-12 d-flex justify-content-center">
+                <div class="w-100" style="max-width: 500px;">
+                    @Body
+                </div>
+            </div>
+        }
     </div>
 </div>
 
 @code {
     private string _searchQuery = "";
+
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+
+    private bool IsAuthPage()
+    {
+        var relative = Nav.ToBaseRelativePath(Nav.Uri).ToLowerInvariant();
+        var idx = relative.IndexOf('?');
+        if (idx >= 0)
+        {
+            relative = relative.Substring(0, idx);
+        }
+        return relative == "login" || relative == "register";
+    }
 
     private void HandleSearchKeyUp(KeyboardEventArgs e)
     {
@@ -71,5 +123,4 @@
     {
         Nav.NavigateTo("/?newthread=true");
     }
-
 }

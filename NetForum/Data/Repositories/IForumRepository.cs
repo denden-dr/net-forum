@@ -4,7 +4,7 @@ using Thread = NetForum.Data.Entities.Thread;
 namespace NetForum.Data.Repositories;
 
 /// <summary>
-/// Defines persistence contract queries and mutations for categories, threads, and posts.
+/// Defines persistence contract queries and mutations for categories, threads, posts, and users.
 /// </summary>
 public interface IForumRepository
 {
@@ -24,7 +24,7 @@ public interface IForumRepository
     Task<List<Thread>> GetThreadsAsync(int? categoryId = null, string? searchQuery = null);
 
     /// <summary>
-    /// Fetches a single thread and its category details by thread GUID.
+    /// Fetches a single thread and its category/author details by thread GUID.
     /// </summary>
     Task<Thread?> GetThreadByIdAsync(Guid threadId);
 
@@ -39,7 +39,7 @@ public interface IForumRepository
     Task UpdateThreadAsync(Thread thread);
 
     /// <summary>
-    /// Fetches all replies for a thread, including self-referencing quote links (chronologically ordered).
+    /// Fetches all replies for a thread, including self-referencing quote links and authors (chronologically ordered).
     /// </summary>
     Task<List<Post>> GetPostsForThreadAsync(Guid threadId);
 
@@ -57,4 +57,14 @@ public interface IForumRepository
     /// Fetches a single post entity by post GUID.
     /// </summary>
     Task<Post?> GetPostByIdAsync(Guid postId);
+
+    /// <summary>
+    /// Fetches a single user profile by GUID.
+    /// </summary>
+    Task<User?> GetUserByIdAsync(Guid userId);
+
+    /// <summary>
+    /// Inserts a new user record into the database.
+    /// </summary>
+    Task<User> CreateUserAsync(User user);
 }

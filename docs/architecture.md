@@ -42,16 +42,28 @@ graph TD
 
 ## 🗄️ PostgreSQL Database Entity Schema
 
-The database consists of three relational entities configured under Entity Framework Core with automatic cascading deletes and unique keys.
+The database consists of four relational entities integrated under Entity Framework Core with Identity framework mappings, automatic cascading deletes, and unique indexes:
 
 ```mermaid
 erDiagram
+    User ||--o{ Thread : "creates"
+    User ||--o{ Post : "writes"
     Category ||--o{ Thread : "has many"
     Thread ||--o{ Post : "has many"
     Post |o--o| Post : "replies to (parent)"
 ```
 
-### 1. `Category`
+### 1. `User` (extends `IdentityUser<Guid>`)
+Represents registered users in the forum, complete with custom fields:
+* **`Id`** (`Guid`, PK): Unique user identifier.
+* **`Username`** (`string`): User account name.
+* **`Email`** (`string`): Verified email address.
+* **`EmailConfirmed`** (`bool`): Account verification status.
+* **`Role`** (`Roles` string/enum): Role-based permissions (`Member` or `Admin`).
+* **`EmailConfirmationRequestsCount`** (`int`): Count of confirmation/verification email requests to prevent spam.
+* **`LastEmailConfirmationRequestAt`** (`DateTimeOffset?`): Timestamp of the last confirmation request used for cooldown enforcement.
+
+### 2. `Category`
 Represents the top-level discussion boards.
 * **`Id`** (`int`, PK): Auto-incrementing identifier.
 * **`Name`** (`string`): Human-readable name.
@@ -60,24 +72,24 @@ Represents the top-level discussion boards.
 * **`Icon`** (`string`): Bootstrap Icons identifier (e.g. `bi-code-slash`).
 * **`DisplayOrder`** (`int`): Positional sorting order on sidebar menus.
 
-### 2. `Thread`
+### 3. `Thread`
 Represents user-created discussions.
 * **`Id`** (`Guid`, PK): Unique thread identifier.
 * **`CategoryId`** (`int`, FK): Target board (Cascade Deletes enabled).
+* **`AuthorId`** (`Guid`, FK): Relates to the creator `User` profile.
 * **`Title`** (`string`): Subject headline.
 * **`Content`** (`string`): Raw body text.
-* **`AuthorName`** (`string`): Poster's name (defaults to `"Anonymous"`).
 * **`CreatedAt`** (`DateTimeOffset`): Exact post time.
 * **`Views`** (`int`): Count of unique clicks.
 * **`Upvotes`** (`int`): Heart count (starts with `1` initial self-vote).
 
-### 3. `Post`
+### 4. `Post`
 Represents comments or replies within a thread.
 * **`Id`** (`Guid`, PK): Unique reply identifier.
 * **`ThreadId`** (`Guid`, FK): Direct thread connection (Cascade Deletes enabled).
+* **`AuthorId`** (`Guid`, FK): Relates to the replier's `User` profile.
 * **`ReplyToPostId`** (`Guid?`, FK): Self-referencing link indicating parent comment.
 * **`Content`** (`string`): Body comment (includes quotation rendering blocks).
-* **`AuthorName`** (`string`): Replier's name.
 * **`CreatedAt`** (`DateTimeOffset`): Chronological stamp.
 * **`Upvotes`** (`int`): Heart count.
 

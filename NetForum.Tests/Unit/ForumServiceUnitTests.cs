@@ -1,4 +1,5 @@
 using Moq;
+using NetForum.Data;
 using NetForum.Data.Entities;
 using NetForum.Data.Repositories;
 using NetForum.Services;
@@ -9,12 +10,14 @@ namespace NetForum.Tests.Unit;
 public class ForumServiceUnitTests
 {
     private readonly Mock<IForumRepository> _mockRepository;
+    private readonly Mock<ICurrentUserService> _mockCurrentUserService;
     private readonly ForumService _service;
 
     public ForumServiceUnitTests()
     {
         _mockRepository = new Mock<IForumRepository>();
-        _service = new ForumService(_mockRepository.Object);
+        _mockCurrentUserService = new Mock<ICurrentUserService>();
+        _service = new ForumService(_mockRepository.Object, _mockCurrentUserService.Object);
     }
 
     [Fact]
@@ -23,8 +26,8 @@ public class ForumServiceUnitTests
         // Arrange
         var expectedCategories = new List<Category>
         {
-            new Category { Id = 1, Name = "General", Slug = "general", DisplayOrder = 1 },
-            new Category { Id = 2, Name = "Programming", Slug = "programming", DisplayOrder = 2 }
+            new() { Id = 1, Name = "General", Slug = "general", DisplayOrder = 1 },
+            new() { Id = 2, Name = "Programming", Slug = "programming", DisplayOrder = 2 }
         };
         _mockRepository.Setup(r => r.GetCategoriesAsync()).ReturnsAsync(expectedCategories);
 
@@ -56,33 +59,6 @@ public class ForumServiceUnitTests
     }
 
     [Fact]
-    public async Task CreateThreadAsync_WithUntrimmedInputsAndEmptyAuthor_TrimsInputsAndDefaultsAuthorToAnonymous()
-    {
-        // Arrange
-        var categoryId = 1;
-        var title = "  Untrimmed Title  ";
-        var content = "  Untrimmed Content  ";
-        var authorName = "   "; // Whitespace should fall back to Anonymous
-
-        Thread? capturedThread = null;
-        _mockRepository.Setup(r => r.CreateThreadAsync(It.IsAny<Thread>()))
-            .Callback<Thread>(t => capturedThread = t)
-            .ReturnsAsync((Thread t) => t);
-
-        // Act
-        var thread = await _service.CreateThreadAsync(categoryId, title, content, authorName);
-
-        // Assert
-        Assert.NotNull(thread);
-        Assert.NotNull(capturedThread);
-        Assert.Equal("Untrimmed Title", capturedThread.Title);
-        Assert.Equal("Untrimmed Content", capturedThread.Content);
-        Assert.Equal("Anonymous", capturedThread.AuthorName);
-        Assert.Equal(1, capturedThread.Upvotes);
-        _mockRepository.Verify(r => r.CreateThreadAsync(It.IsAny<Thread>()), Times.Once);
-    }
-
-    [Fact]
     public async Task GetThreadsAsync_WithCategoryIdAndSearchQuery_DelegatesToRepositoryWithFilters()
     {
         // Arrange
@@ -90,7 +66,7 @@ public class ForumServiceUnitTests
         var query = "Vite";
         var expectedThreads = new List<Thread>
         {
-            new Thread { Id = Guid.NewGuid(), Title = "Vite vs Webpack" }
+            new() { Id = Guid.NewGuid(), Title = "Vite vs Webpack" }
         };
         _mockRepository.Setup(r => r.GetThreadsAsync(categoryId, query)).ReturnsAsync(expectedThreads);
 
@@ -124,9 +100,133 @@ public class ForumServiceUnitTests
     }
 
     [Fact]
-    public async Task UpvoteThreadAsync_WithValidThreadId_IncrementsUpvotesAndPersists()
+    public async Task GetPostsForThreadAsync_WithThreadId_DelegatesToRepository()
     {
         // Arrange
+        var threadId = Guid.NewGuid();
+        var expectedPosts = new List<Post>
+        {
+            new() { Id = Guid.NewGuid(), Content = "First" },
+            new() { Id = Guid.NewGuid(), Content = "Second" }
+        };
+        _mockRepository.Setup(r => r.GetPostsForThreadAsync(threadId)).ReturnsAsync(expectedPosts);
+
+        // Act
+        var posts = await _service.GetPostsForThreadAsync(threadId);
+
+        // Assert
+        Assert.NotNull(posts);
+        Assert.Equal(2, posts.Count);
+        _mockRepository.Verify(r => r.GetPostsForThreadAsync(threadId), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateThreadAsync_WhenAnonymous_ThrowsUnauthorizedAccessException()
+    {
+        // Arrange
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(false);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _service.CreateThreadAsync(1, "Title", "Content"));
+    }
+
+    [Fact]
+    public async Task CreateThreadAsync_WhenAuthenticated_CreatesThreadWithAuthor()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
+        _mockCurrentUserService.Setup(u => u.Username).Returns("MemberUser");
+
+        var user = new User { Id = userId, Username = "MemberUser", EmailConfirmed = true };
+        _mockRepository.Setup(r => r.GetUserByIdAsync(userId)).ReturnsAsync(user);
+
+        Thread? capturedThread = null;
+        _mockRepository.Setup(r => r.CreateThreadAsync(It.IsAny<Thread>()))
+            .Callback<Thread>(t => capturedThread = t)
+            .ReturnsAsync((Thread t) => t);
+
+        // Act
+        var thread = await _service.CreateThreadAsync(1, "  My Title  ", "  My Content  ");
+
+        // Assert
+        Assert.NotNull(thread);
+        Assert.NotNull(capturedThread);
+        Assert.Equal("My Title", capturedThread.Title);
+        Assert.Equal("My Content", capturedThread.Content);
+        Assert.Equal(userId, capturedThread.AuthorId);
+        Assert.Equal(1, capturedThread.Upvotes);
+        _mockRepository.Verify(r => r.CreateThreadAsync(It.IsAny<Thread>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreatePostAsync_WhenAnonymous_ThrowsUnauthorizedAccessException()
+    {
+        // Arrange
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(false);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _service.CreatePostAsync(Guid.NewGuid(), "Content"));
+    }
+
+    [Fact]
+    public async Task CreatePostAsync_WhenAuthenticated_CreatesPostWithAuthor()
+    {
+        // Arrange
+        var threadId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var replyToId = Guid.NewGuid();
+
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
+        _mockCurrentUserService.Setup(u => u.Username).Returns("MemberUser");
+
+        var user = new User { Id = userId, Username = "MemberUser", EmailConfirmed = true };
+        _mockRepository.Setup(r => r.GetUserByIdAsync(userId)).ReturnsAsync(user);
+
+        Post? capturedPost = null;
+        _mockRepository.Setup(r => r.CreatePostAsync(It.IsAny<Post>()))
+            .Callback<Post>(p => capturedPost = p)
+            .ReturnsAsync((Post p) => p);
+
+        // Act
+        var post = await _service.CreatePostAsync(threadId, "  Reply content  ", replyToId);
+
+        // Assert
+        Assert.NotNull(post);
+        Assert.NotNull(capturedPost);
+        Assert.Equal("Reply content", capturedPost.Content);
+        Assert.Equal(userId, capturedPost.AuthorId);
+        Assert.Equal(replyToId, capturedPost.ReplyToPostId);
+        Assert.Equal(0, capturedPost.Upvotes);
+        _mockRepository.Verify(r => r.CreatePostAsync(It.IsAny<Post>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpvoteThreadAsync_WhenAnonymous_ThrowsUnauthorizedAccessException()
+    {
+        // Arrange
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(false);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _service.UpvoteThreadAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task UpvoteThreadAsync_WhenAuthenticated_IncrementsUpvotesAndPersists()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
+        
+        var user = new User { Id = userId, Username = "VoterUser", EmailConfirmed = true };
+        _mockRepository.Setup(r => r.GetUserByIdAsync(userId)).ReturnsAsync(user);
+
         var threadId = Guid.NewGuid();
         var thread = new Thread { Id = threadId, Upvotes = 4 };
         _mockRepository.Setup(r => r.GetThreadByIdAsync(threadId)).ReturnsAsync(thread);
@@ -142,57 +242,27 @@ public class ForumServiceUnitTests
     }
 
     [Fact]
-    public async Task CreatePostAsync_WithUntrimmedInputsAndEmptyAuthor_TrimsInputsAndDefaultsAuthorToAnonymous()
+    public async Task UpvotePostAsync_WhenAnonymous_ThrowsUnauthorizedAccessException()
     {
         // Arrange
-        var threadId = Guid.NewGuid();
-        var content = "   My response text   ";
-        var authorName = "";
-        var replyToId = Guid.NewGuid();
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(false);
 
-        Post? capturedPost = null;
-        _mockRepository.Setup(r => r.CreatePostAsync(It.IsAny<Post>()))
-            .Callback<Post>(p => capturedPost = p)
-            .ReturnsAsync((Post p) => p);
-
-        // Act
-        var post = await _service.CreatePostAsync(threadId, content, authorName, replyToId);
-
-        // Assert
-        Assert.NotNull(post);
-        Assert.NotNull(capturedPost);
-        Assert.Equal("My response text", capturedPost.Content);
-        Assert.Equal("Anonymous", capturedPost.AuthorName);
-        Assert.Equal(replyToId, capturedPost.ReplyToPostId);
-        Assert.Equal(0, capturedPost.Upvotes);
-        _mockRepository.Verify(r => r.CreatePostAsync(It.IsAny<Post>()), Times.Once);
+        // Act & Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _service.UpvotePostAsync(Guid.NewGuid()));
     }
 
     [Fact]
-    public async Task GetPostsForThreadAsync_WithThreadId_DelegatesToRepository()
+    public async Task UpvotePostAsync_WhenAuthenticated_IncrementsUpvotesAndPersists()
     {
         // Arrange
-        var threadId = Guid.NewGuid();
-        var expectedPosts = new List<Post>
-        {
-            new Post { Id = Guid.NewGuid(), Content = "First" },
-            new Post { Id = Guid.NewGuid(), Content = "Second" }
-        };
-        _mockRepository.Setup(r => r.GetPostsForThreadAsync(threadId)).ReturnsAsync(expectedPosts);
+        var userId = Guid.NewGuid();
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
 
-        // Act
-        var posts = await _service.GetPostsForThreadAsync(threadId);
+        var user = new User { Id = userId, Username = "VoterUser", EmailConfirmed = true };
+        _mockRepository.Setup(r => r.GetUserByIdAsync(userId)).ReturnsAsync(user);
 
-        // Assert
-        Assert.NotNull(posts);
-        Assert.Equal(2, posts.Count);
-        _mockRepository.Verify(r => r.GetPostsForThreadAsync(threadId), Times.Once);
-    }
-
-    [Fact]
-    public async Task UpvotePostAsync_WithValidPostId_IncrementsUpvotesAndPersists()
-    {
-        // Arrange
         var postId = Guid.NewGuid();
         var post = new Post { Id = postId, Upvotes = 10 };
         _mockRepository.Setup(r => r.GetPostByIdAsync(postId)).ReturnsAsync(post);
@@ -205,5 +275,146 @@ public class ForumServiceUnitTests
         Assert.Equal(11, post.Upvotes);
         _mockRepository.Verify(r => r.GetPostByIdAsync(postId), Times.Once);
         _mockRepository.Verify(r => r.UpdatePostAsync(post), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateThread_Throws_UnauthorizedAccessException_When_Email_Not_Confirmed()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+
+        var unconfirmedUser = new User 
+        { 
+            Id = userId,
+            EmailConfirmed = false,
+            Role = Roles.Member
+        };
+
+        _mockRepository.Setup(r => r.GetUserByIdAsync(unconfirmedUser.Id)).ReturnsAsync(unconfirmedUser);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => 
+            _service.CreateThreadAsync(1, "Title", "Content")
+        );
+    }
+
+    [Fact]
+    public async Task CreatePost_Throws_UnauthorizedAccessException_When_Email_Not_Confirmed()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+
+        var unconfirmedUser = new User 
+        { 
+            Id = userId,
+            EmailConfirmed = false,
+            Role = Roles.Member
+        };
+
+        _mockRepository.Setup(r => r.GetUserByIdAsync(unconfirmedUser.Id)).ReturnsAsync(unconfirmedUser);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => 
+            _service.CreatePostAsync(Guid.NewGuid(), "Content")
+        );
+    }
+
+    [Fact]
+    public async Task UpvoteThread_Throws_UnauthorizedAccessException_When_Email_Not_Confirmed()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+
+        var unconfirmedUser = new User 
+        { 
+            Id = userId,
+            EmailConfirmed = false,
+            Role = Roles.Member
+        };
+
+        _mockRepository.Setup(r => r.GetUserByIdAsync(unconfirmedUser.Id)).ReturnsAsync(unconfirmedUser);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => 
+            _service.UpvoteThreadAsync(Guid.NewGuid())
+        );
+    }
+
+    [Fact]
+    public async Task UpvotePost_Throws_UnauthorizedAccessException_When_Email_Not_Confirmed()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+
+        var unconfirmedUser = new User 
+        { 
+            Id = userId,
+            EmailConfirmed = false,
+            Role = Roles.Member
+        };
+
+        _mockRepository.Setup(r => r.GetUserByIdAsync(unconfirmedUser.Id)).ReturnsAsync(unconfirmedUser);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => 
+            _service.UpvotePostAsync(Guid.NewGuid())
+        );
+    }
+
+    [Fact]
+    public async Task IsCurrentEmailConfirmedAsync_WhenAnonymous_ReturnsFalse()
+    {
+        // Arrange
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(false);
+
+        // Act
+        var result = await _service.IsCurrentEmailConfirmedAsync();
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task IsCurrentEmailConfirmedAsync_WhenAuthenticatedAndNotConfirmed_ReturnsFalse()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
+
+        var unconfirmedUser = new User { Id = userId, EmailConfirmed = false };
+        _mockRepository.Setup(r => r.GetUserByIdAsync(userId)).ReturnsAsync(unconfirmedUser);
+
+        // Act
+        var result = await _service.IsCurrentEmailConfirmedAsync();
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task IsCurrentEmailConfirmedAsync_WhenAuthenticatedAndConfirmed_ReturnsTrue()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
+
+        var confirmedUser = new User { Id = userId, EmailConfirmed = true };
+        _mockRepository.Setup(r => r.GetUserByIdAsync(userId)).ReturnsAsync(confirmedUser);
+
+        // Act
+        var result = await _service.IsCurrentEmailConfirmedAsync();
+
+        // Assert
+        Assert.True(result);
     }
 }

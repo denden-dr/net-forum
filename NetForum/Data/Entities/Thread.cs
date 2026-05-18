@@ -15,8 +15,10 @@ public class Thread
     [Required]
     public string Content { get; set; } = string.Empty;
 
-    [Required, MaxLength(100)]
-    public string AuthorName { get; set; } = "Anonymous";
+    [Required]
+    public Guid AuthorId { get; set; }
+
+    public User? Author { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 

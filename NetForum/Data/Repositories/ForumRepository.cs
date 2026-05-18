@@ -27,6 +27,7 @@ public class ForumRepository(IDbContextFactory<AppDbContext> contextFactory) : I
         await using var context = await contextFactory.CreateDbContextAsync();
         var query = context.Threads
             .Include(t => t.Category)
+            .Include(t => t.Author)
             .Include(t => t.Posts)
             .AsQueryable();
 
@@ -53,6 +54,7 @@ public class ForumRepository(IDbContextFactory<AppDbContext> contextFactory) : I
         await using var context = await contextFactory.CreateDbContextAsync();
         return await context.Threads
             .Include(t => t.Category)
+            .Include(t => t.Author)
             .FirstOrDefaultAsync(t => t.Id == threadId);
     }
 
@@ -76,6 +78,7 @@ public class ForumRepository(IDbContextFactory<AppDbContext> contextFactory) : I
         await using var context = await contextFactory.CreateDbContextAsync();
         return await context.Posts
             .Include(p => p.ReplyToPost)
+            .Include(p => p.Author)
             .Where(p => p.ThreadId == threadId)
             .OrderBy(p => p.CreatedAt)
             .ToListAsync();
@@ -99,6 +102,20 @@ public class ForumRepository(IDbContextFactory<AppDbContext> contextFactory) : I
     public async Task<Post?> GetPostByIdAsync(Guid postId)
     {
         await using var context = await contextFactory.CreateDbContextAsync();
-        return await context.Posts.FindAsync(postId);
+        return await context.Posts.Include(p => p.Author).FirstOrDefaultAsync(p => p.Id == postId);
+    }
+
+    public async Task<User?> GetUserByIdAsync(Guid userId)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        return await context.Users.FindAsync(userId);
+    }
+
+    public async Task<User> CreateUserAsync(User user)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+        return user;
     }
 }

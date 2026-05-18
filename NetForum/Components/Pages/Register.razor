@@ -1,0 +1,160 @@
+@page "/register"
+@rendermode InteractiveServer
+@using NetForum.Data.Entities
+@using NetForum.Data
+@using Microsoft.AspNetCore.Identity
+@inject UserManager<User> UserManager
+@inject NavigationManager Nav
+@inject ILogger<Register> Logger
+
+<PageTitle>NetForum - Create Account</PageTitle>
+
+<div class="container py-5 d-flex justify-content-center">
+    <div class="premium-card p-4 border" style="max-width: 450px; width: 100%; border-radius: 16px; background-color: var(--bg-card); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+        <h3 class="fw-bold mb-3 text-primary">Create an Account</h3>
+        
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger small py-2 px-3 mb-3 border-0" style="border-radius: 8px;">@_errorMessage</div>
+        }
+        @if (_registrationSuccess)
+        {
+            <div class="alert alert-success small py-2.5 px-3 mb-3 border-0" style="border-radius: 8px;">
+                Registration successful! ✉️ <strong>Verification link printed in your development console.</strong>
+            </div>
+        }
+
+        <div class="mb-3">
+            <label class="form-label small fw-semibold text-secondary">Username</label>
+            <input type="text" class="form-control py-2" @bind="_username" placeholder="developer101" style="border-radius: 8px;" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label small fw-semibold text-secondary">Email Address</label>
+            <input type="email" class="form-control py-2" @bind="_email" placeholder="dev@netforum.com" style="border-radius: 8px;" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label small fw-semibold text-secondary">Password</label>
+            <input type="password" class="form-control py-2" @bind="_password" placeholder="Min. 6 characters" style="border-radius: 8px;" />
+        </div>
+
+        <button class="btn text-white w-100 py-2 mb-3 fw-semibold" style="background-color: var(--accent); border-radius: 8px;" @onclick="HandleRegistration">
+            Sign Up
+        </button>
+        
+        <div class="text-center text-muted small">
+            Already have an account? <a href="/login" class="text-decoration-none" style="color: var(--accent); font-weight: 500;">Log In</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _username = "";
+    private string _email = "";
+    private string _password = "";
+    private string _errorMessage = "";
+    private bool _registrationSuccess;
+
+    private async Task HandleRegistration()
+    {
+        if (string.IsNullOrWhiteSpace(_username) || string.IsNullOrWhiteSpace(_email) || string.IsNullOrWhiteSpace(_password))
+        {
+            _errorMessage = "All fields are required.";
+            return;
+        }
+
+        // Try to check if user already exists
+        var existingUser = await UserManager.FindByEmailAsync(_email.Trim());
+        if (existingUser != null)
+        {
+            // If they registered via Google OAuth and have no password
+            if (!await UserManager.HasPasswordAsync(existingUser))
+            {
+                var logins = await UserManager.GetLoginsAsync(existingUser);
+                if (logins.Any(l => l.LoginProvider == "Google"))
+                {
+                    _errorMessage = "This email is registered with a Google account. Please sign in using Google.";
+                    return;
+                }
+            }
+
+            if (existingUser.EmailConfirmed)
+            {
+                _errorMessage = "Email is already in use by a confirmed account.";
+                return;
+            }
+
+            // Secure Email Cooldown / Spam limit validation (3 requests per 24 hours)
+            var now = DateTimeOffset.UtcNow;
+            if (existingUser.LastEmailConfirmationRequestAt.HasValue && 
+                now - existingUser.LastEmailConfirmationRequestAt.Value < TimeSpan.FromDays(1))
+            {
+                if (existingUser.EmailConfirmationRequestsCount >= 3)
+                {
+                    _errorMessage = "Verification email request limit reached (3 per day). Please try again tomorrow.";
+                    return;
+                }
+            }
+            else
+            {
+                // Reset limit count after a day passes
+                existingUser.EmailConfirmationRequestsCount = 0;
+            }
+
+            // Invalidate any old tokens by updating the user's SecurityStamp!
+            await UserManager.UpdateSecurityStampAsync(existingUser);
+
+            // Generate new token & update user request trackers
+            existingUser.EmailConfirmationRequestsCount++;
+            existingUser.LastEmailConfirmationRequestAt = now;
+            var updateResult = await UserManager.UpdateAsync(existingUser);
+            if (!updateResult.Succeeded)
+            {
+                _errorMessage = string.Join(" ", updateResult.Errors.Select(e => e.Description));
+                return;
+            }
+
+            var newToken = await UserManager.GenerateEmailConfirmationTokenAsync(existingUser);
+            var newVerifyUrl = $"{Nav.BaseUri}verify-email?userId={existingUser.Id}&token={Uri.EscapeDataString(newToken)}";
+
+            _registrationSuccess = true;
+            _errorMessage = "";
+
+            Logger.LogWarning("\n========================================================================\n" +
+                              "[DEV AUTH] EMAIL CONFIRMATION LINK (RESEND - OLD INVALIDATED):\n" +
+                              $"To confirm the account for {existingUser.Email}, click the link below:\n" +
+                              $"{newVerifyUrl}\n" +
+                              "========================================================================\n");
+            return;
+        }
+
+        var user = new User 
+        { 
+            UserName = _username.Trim(), 
+            Email = _email.Trim(),
+            Role = Roles.Member,
+            CreatedAt = DateTimeOffset.UtcNow,
+            EmailConfirmationRequestsCount = 1,
+            LastEmailConfirmationRequestAt = DateTimeOffset.UtcNow
+        };
+        var result = await UserManager.CreateAsync(user, _password);
+
+        if (result.Succeeded)
+        {
+            _registrationSuccess = true;
+            _errorMessage = "";
+            
+            var token = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+            var verifyUrl = $"{Nav.BaseUri}verify-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+
+            Logger.LogWarning("\n========================================================================\n" +
+                              "[DEV AUTH] EMAIL CONFIRMATION LINK:\n" +
+                              $"To confirm the account for {user.Email}, click the link below:\n" +
+                              $"{verifyUrl}\n" +
+                              "========================================================================\n");
+        }
+        else
+        {
+            _errorMessage = string.Join(" ", result.Errors.Select(e => e.Description));
+        }
+    }
+}

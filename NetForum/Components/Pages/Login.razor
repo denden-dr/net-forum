@@ -1,0 +1,66 @@
+@page "/login"
+@rendermode InteractiveServer
+@inject NavigationManager Nav
+
+<PageTitle>NetForum - Log In</PageTitle>
+
+<div class="container py-5 d-flex justify-content-center">
+    <div class="premium-card p-4 border" style="max-width: 450px; width: 100%; border-radius: 16px; background-color: var(--bg-card); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+        <h3 class="fw-bold mb-3 text-primary">Sign In</h3>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger small py-2 px-3 mb-3 border-0" style="border-radius: 8px;">@_error</div>
+        }
+
+        <form action="/api/auth/login" method="post">
+            <AntiforgeryToken/>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-secondary">Username or Email</label>
+                <input type="text" name="username" class="form-control py-2" placeholder="dev@netforum.com" style="border-radius: 8px;"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-secondary">Password</label>
+                <input type="password" name="password" class="form-control py-2" placeholder="••••••••" style="border-radius: 8px;"/>
+            </div>
+
+            <button type="submit" class="btn text-white w-100 py-2 mb-3 fw-semibold" style="background-color: var(--accent); border-radius: 8px;">
+                Log In
+            </button>
+        </form>
+
+        <a href="/api/auth/google-login" class="btn btn-outline-dark w-100 py-2 mb-3 d-flex align-items-center justify-content-center gap-2 fw-semibold" style="border-radius: 8px;">
+            <i class="bi bi-google"></i> Continue with Google
+        </a>
+
+        <div class="text-center text-muted small">
+            Don't have an account? <a href="/register" class="text-decoration-none" style="color: var(--accent); font-weight: 500;">Sign Up</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("error", out var errVal))
+        {
+            _error = errVal.ToString() switch
+            {
+                "InvalidCredentials" => "Invalid credentials or login attempt.",
+                "EmailNotVerified" => "Your email is not verified yet. Please verify using the console link.",
+                "GoogleAuthFailed" => "Google Sign-In failed.",
+                "GoogleEmailRequired" => "Google did not provide an email address.",
+                "RegistrationFailed" => "Registration failed during social login.",
+                "GoogleAccountRegistered" => "This email is registered with a Google account. Please click 'Continue with Google' to sign in.",
+                _ => "Invalid credentials or login attempt."
+            };
+
+            // Instantly clear query parameters from the browser address bar
+            Nav.NavigateTo("/login", replace: true);
+        }
+    }
+
+}

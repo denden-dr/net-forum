@@ -1,23 +1,24 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using NetForum.Data.Entities;
 using Thread = NetForum.Data.Entities.Thread;
 
-
 namespace NetForum.Data;
 
-public class AppDbContext : DbContext
+public class AppDbContext(DbContextOptions<AppDbContext> options) 
+    : IdentityDbContext<User, IdentityRole<Guid>, Guid>(options)
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
-    {
-    }
-
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Thread> Threads => Set<Thread>();
     public DbSet<Post> Posts => Set<Post>();
 
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<User>().ToTable("Users");
 
         // Configure Category
         modelBuilder.Entity<Category>()
@@ -31,6 +32,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(t => t.CategoryId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<Thread>()
+            .HasOne(t => t.Author)
+            .WithMany()
+            .HasForeignKey(t => t.AuthorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Configure Post
         modelBuilder.Entity<Post>()
             .HasOne(p => p.Thread)
@@ -43,6 +50,12 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(p => p.ReplyToPostId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Post>()
+            .HasOne(p => p.Author)
+            .WithMany()
+            .HasForeignKey(p => p.AuthorId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Seed Core Categories
         modelBuilder.Entity<Category>().HasData(

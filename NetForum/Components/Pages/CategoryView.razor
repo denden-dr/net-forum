@@ -1,7 +1,8 @@
 @page "/category/{Slug}"
-@inject NetForum.Services.IForumService ForumService
+@using NetForum.Data.Entities
+@inject Services.IForumService ForumService
 
-@if (category == null)
+@if (_category == null)
 {
     <div class="d-flex justify-content-center my-5">
         <div class="spinner-border text-primary" role="status" style="color: var(--accent) !important;"></div>
@@ -9,35 +10,35 @@
 }
 else
 {
-    <PageTitle>NetForum - @category.Name</PageTitle>
+    <PageTitle>NetForum - @_category.Name</PageTitle>
 
     <div class="premium-card bg-light border-0 mb-4 py-4 px-4" style="background-color: #f8fafc !important; border-radius: 16px;">
         <h2 class="fw-bold d-flex align-items-center mb-2" style="font-size: 1.75rem;">
-            <i class="bi @category.Icon me-3 text-indigo" style="color: var(--accent);"></i>
-            @category.Name
+            <i class="bi @_category.Icon me-3 text-indigo" style="color: var(--accent);"></i>
+            @_category.Name
         </h2>
-        <p class="text-secondary mb-0" style="font-size: 0.95rem;">@category.Description</p>
+        <p class="text-secondary mb-0" style="font-size: 0.95rem;">@_category.Description</p>
     </div>
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 class="fw-bold m-0 text-muted" style="font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.5px;">Category Discussions</h4>
         <div class="btn-group border rounded" role="group" style="padding: 2px; background-color: #f1f5f9;">
             <button class="btn btn-sm px-3 py-1.5 border-0" 
-                    style="border-radius: 6px; font-weight: 500; transition: background-color 0.15s ease; @(sortBy == "latest" ? "background-color: var(--bg-card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.05);" : "color: var(--text-secondary); background: none;")" 
+                    style="border-radius: 6px; font-weight: 500; transition: background-color 0.15s ease; @(_sortBy == "latest" ? "background-color: var(--bg-card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.05);" : "color: var(--text-secondary); background: none;")" 
                     @onclick='() => ChangeSort("latest")'>Latest</button>
             <button class="btn btn-sm px-3 py-1.5 border-0" 
-                    style="border-radius: 6px; font-weight: 500; transition: background-color 0.15s ease; @(sortBy == "top" ? "background-color: var(--bg-card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.05);" : "color: var(--text-secondary); background: none;")" 
+                    style="border-radius: 6px; font-weight: 500; transition: background-color 0.15s ease; @(_sortBy == "top" ? "background-color: var(--bg-card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.05);" : "color: var(--text-secondary); background: none;")" 
                     @onclick='() => ChangeSort("top")'>Top Voted</button>
         </div>
     </div>
 
-    @if (threads == null)
+    @if (_threads == null)
     {
         <div class="d-flex justify-content-center my-3">
             <div class="spinner-border text-secondary" role="status" style="color: var(--accent) !important;"></div>
         </div>
     }
-    else if (!threads.Any())
+    else if (!_threads.Any())
     {
         <div class="premium-card text-center py-5">
             <i class="bi bi-card-text text-muted display-4 d-block mb-3"></i>
@@ -47,7 +48,7 @@ else
     }
     else
     {
-        @foreach (var t in threads)
+        @foreach (var t in _threads)
         {
             <div class="premium-card d-flex align-items-start gap-3">
                 <div class="d-flex flex-column align-items-center rounded p-1" style="background-color: #f8fafc; border: 1px solid var(--border-color); min-width: 44px;">
@@ -59,7 +60,7 @@ else
 
                 <div class="flex-grow-1">
                     <div class="d-flex align-items-center gap-2 mb-1.5">
-                        <span class="text-muted small">Posted by @t.AuthorName • @GetTimeAgo(t.CreatedAt)</span>
+                        <span class="text-muted small">Posted by @(t.Author?.Username ?? "Anonymous") • @GetTimeAgo(t.CreatedAt)</span>
                     </div>
                     <h4 class="fw-bold h5 mb-1.5">
                         <a href="/thread/@t.Id" class="text-decoration-none text-dark" style="transition: color 0.15s ease;">@t.Title</a>
@@ -69,7 +70,7 @@ else
 
                 <div class="d-flex align-items-center gap-1.5 text-muted small px-3 py-2 rounded" style="background-color: #f8fafc; border: 1px solid var(--border-color); font-weight: 500;">
                     <i class="bi bi-chat-left-dots-fill" style="color: var(--accent);"></i>
-                    <span>@(t.Posts?.Count ?? 0) replies</span>
+                    <span>@t.Posts.Count replies</span>
                 </div>
             </div>
         }
@@ -77,17 +78,16 @@ else
 }
 
 @code {
-    [Parameter]
-    public string Slug { get; set; } = string.Empty;
+    [Parameter] public string Slug { get; set; } = string.Empty;
 
-    private NetForum.Data.Entities.Category? category;
-    private List<NetForum.Data.Entities.Thread>? threads;
-    private string sortBy = "latest";
+    private Category? _category;
+    private List<Thread>? _threads;
+    private string _sortBy = "latest";
 
     protected override async Task OnParametersSetAsync()
     {
-        category = await ForumService.GetCategoryBySlugAsync(Slug);
-        if (category != null)
+        _category = await ForumService.GetCategoryBySlugAsync(Slug);
+        if (_category != null)
         {
             await LoadThreads();
         }
@@ -95,23 +95,22 @@ else
 
     private async Task LoadThreads()
     {
-        if (category == null) return;
-        threads = await ForumService.GetThreadsAsync(category.Id);
+        if (_category == null) return;
+        _threads = await ForumService.GetThreadsAsync(_category.Id);
         ApplySorting();
     }
 
     private void ApplySorting()
     {
-        if (threads == null) return;
-        if (sortBy == "latest")
-            threads = threads.OrderByDescending(t => t.CreatedAt).ToList();
-        else
-            threads = threads.OrderByDescending(t => t.Upvotes).ToList();
+        if (_threads == null) return;
+        _threads = _sortBy == "latest"
+            ? _threads.OrderByDescending(t => t.CreatedAt).ToList()
+            : _threads.OrderByDescending(t => t.Upvotes).ToList();
     }
 
     private void ChangeSort(string mode)
     {
-        sortBy = mode;
+        _sortBy = mode;
         ApplySorting();
     }
 

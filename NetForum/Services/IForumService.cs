@@ -31,7 +31,7 @@ public interface IForumService
     /// <summary>
     /// Creates and persists a new thread under a category with string sanitization and auto self-upvoting.
     /// </summary>
-    Task<Thread> CreateThreadAsync(int categoryId, string title, string content, string authorName);
+    Task<Thread> CreateThreadAsync(int categoryId, string title, string content);
 
     /// <summary>
     /// Increments a thread's upvote count by 1.
@@ -46,10 +46,15 @@ public interface IForumService
     /// <summary>
     /// Creates a reply post for a thread with string sanitization and optional citation of a parent post.
     /// </summary>
-    Task<Post> CreatePostAsync(Guid threadId, string content, string authorName, Guid? replyToPostId = null);
+    Task<Post> CreatePostAsync(Guid threadId, string content, Guid? replyToPostId = null);
 
     /// <summary>
     /// Increments a post's upvote count by 1.
     /// </summary>
     Task UpvotePostAsync(Guid postId);
+
+    /// <summary>
+    /// Checks if the current logged-in user's email is confirmed.
+    /// </summary>
+    Task<bool> IsCurrentEmailConfirmedAsync();
 }

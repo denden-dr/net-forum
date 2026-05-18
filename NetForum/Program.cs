@@ -45,6 +45,15 @@ builder.Services.ConfigureApplicationCookie(options => {
 
 builder.Services.AddAuthentication()
     .AddGoogle(options => {
+        if (!builder.Environment.IsDevelopment())
+        {
+            var clientId = builder.Configuration["Authentication:Google:ClientId"];
+            var clientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+            if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret))
+            {
+                throw new InvalidOperationException("Google OAuth ClientId and ClientSecret are required in non-development environments.");
+            }
+        }
         options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "dummy-client-id";
         options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "dummy-client-secret";
     });
@@ -54,8 +63,6 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
-
-
 
 // Configure the HTTP request pipeline
 if (!app.Environment.IsDevelopment())

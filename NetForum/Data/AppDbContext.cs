@@ -64,20 +64,5 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             new Category { Id = 3, Name = "Q&A / Support", Description = "Got a technical question? Ask the community for help.", Slug = "qa", Icon = "bi-question-circle", DisplayOrder = 3 },
             new Category { Id = 4, Name = "Announcements", Description = "Official updates, guidelines, and site news.", Slug = "announcements", Icon = "bi-megaphone", DisplayOrder = 4 }
         );
-
-        // Seed default developer user to match DevCurrentUserService
-        modelBuilder.Entity<User>().HasData(new User
-        {
-            Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
-            UserName = "DevUser",
-            NormalizedUserName = "DEVUSER",
-            Email = "devuser@netforum.com",
-            NormalizedEmail = "DEVUSER@NETFORUM.COM",
-            EmailConfirmed = true,
-            SecurityStamp = "00000000-0000-0000-0000-000000000000",
-            ConcurrencyStamp = "00000000-0000-0000-0000-000000000000",
-            Role = NetForum.Data.Roles.Member,
-            CreatedAt = new DateTimeOffset(2026, 5, 17, 0, 0, 0, TimeSpan.Zero)
-        });
     }
 }

@@ -1,0 +1,87 @@
+using System.Text.RegularExpressions;
+using NetForum.Data.Entities;
+using NetForum.Data.Repositories;
+
+namespace NetForum.Services;
+
+public class NotificationService(INotificationRepository repository) : INotificationService
+{
+    private static readonly Regex MentionRegex = new(@"\B@([a-zA-Z0-9_\-]+)\b", RegexOptions.Compiled);
+
+    public Task<List<Notification>> GetNotificationsForUserAsync(Guid userId, int limit = 20) =>
+        repository.GetNotificationsForUserAsync(userId, limit);
+
+    public Task<int> GetUnreadNotificationCountAsync(Guid userId) =>
+        repository.GetUnreadNotificationCountAsync(userId);
+
+    public Task MarkNotificationAsReadAsync(Guid notificationId)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await repository.MarkNotificationAsReadAsync(notificationId);
+            }
+            catch
+            {
+                // Silently catch background processing exceptions
+            }
+        });
+        return Task.CompletedTask;
+    }
+
+    public Task MarkAllNotificationsAsReadForUserAsync(Guid userId)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await repository.MarkAllNotificationsAsReadForUserAsync(userId);
+            }
+            catch
+            {
+                // Silently catch background processing exceptions
+            }
+        });
+        return Task.CompletedTask;
+    }
+
+    public async Task ParseAndCreateMentionsAsync(string content, Guid threadId, Guid? postId, User sender)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return;
+
+        var matches = MentionRegex.Matches(content);
+        var usernames = matches
+            .Select(m => m.Groups[1].Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(username => !string.Equals(username, sender.Username, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (usernames.Count == 0) return;
+
+        var recipients = await repository.GetUsersByUsernamesAsync(usernames);
+        foreach (var recipient in recipients)
+        {
+            var snippet = content.Length > 60 ? content[..60] + "..." : content;
+            var preview = $"{sender.Username} mentioned you: \"{snippet}\"";
+
+            await CreateNotificationAsync(recipient.Id, sender.Id, threadId, postId, preview);
+        }
+    }
+
+    public async Task CreateNotificationAsync(Guid recipientId, Guid senderId, Guid threadId, Guid? postId, string contentPreview)
+    {
+        var notification = new Notification
+        {
+            RecipientId = recipientId,
+            SenderId = senderId,
+            ThreadId = threadId,
+            PostId = postId,
+            ContentPreview = contentPreview,
+            IsRead = false,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        await repository.CreateNotificationAsync(notification);
+    }
+}

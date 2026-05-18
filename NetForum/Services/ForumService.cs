@@ -4,7 +4,10 @@ using Thread = NetForum.Data.Entities.Thread;
 
 namespace NetForum.Services;
 
-public class ForumService(IForumRepository repository, ICurrentUserService currentUserService) : IForumService
+public class ForumService(
+    IForumRepository repository,
+    INotificationService notificationService,
+    ICurrentUserService currentUserService) : IForumService
 {
     public Task<List<Category>> GetCategoriesAsync() => repository.GetCategoriesAsync();
 
@@ -21,6 +24,7 @@ public class ForumService(IForumRepository repository, ICurrentUserService curre
             thread.Views++;
             await repository.UpdateThreadAsync(thread);
         }
+
         return thread;
     }
 
@@ -34,7 +38,8 @@ public class ForumService(IForumRepository repository, ICurrentUserService curre
         }
 
         var userId = currentUserService.UserId ?? throw new UnauthorizedAccessException("User ID is missing.");
-        var user = await repository.GetUserByIdAsync(userId) ?? throw new UnauthorizedAccessException("User profile not found.");
+        var user = await repository.GetUserByIdAsync(userId) ??
+                   throw new UnauthorizedAccessException("User profile not found.");
 
         if (!user.EmailConfirmed)
         {
@@ -60,6 +65,20 @@ public class ForumService(IForumRepository repository, ICurrentUserService curre
 
         var created = await repository.CreateThreadAsync(thread);
         created.Author = user;
+
+        // Non-blocking fire-and-forget mentions processing
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await notificationService.ParseAndCreateMentionsAsync(content, created.Id, null, user);
+            }
+            catch
+            {
+                // Silently handle any background thread exceptions
+            }
+        });
+
         return created;
     }
 
@@ -91,6 +110,45 @@ public class ForumService(IForumRepository repository, ICurrentUserService curre
 
         var created = await repository.CreatePostAsync(post);
         created.Author = user;
+
+        // Fire-and-forget notifications processing
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                // 1. Thread reply notification
+                var thread = await repository.GetThreadByIdAsync(threadId);
+                if (thread != null && thread.AuthorId != user.Id)
+                {
+                    var snippet = content.Length > 60 ? content[..60] + "..." : content;
+                    var preview = $"{user.Username} replied to your thread: \"{snippet}\"";
+                    await notificationService.CreateNotificationAsync(thread.AuthorId, user.Id, threadId, created.Id,
+                        preview);
+                }
+
+                // 2. Quote notification
+                if (replyToPostId.HasValue)
+                {
+                    var parentPost = await repository.GetPostByIdAsync(replyToPostId.Value);
+                    if (parentPost != null && parentPost.AuthorId != user.Id &&
+                        (thread == null || parentPost.AuthorId != thread.AuthorId))
+                    {
+                        var snippet = content.Length > 60 ? content[..60] + "..." : content;
+                        var preview = $"{user.Username} quoted your reply: \"{snippet}\"";
+                        await notificationService.CreateNotificationAsync(parentPost.AuthorId, user.Id, threadId,
+                            created.Id, preview);
+                    }
+                }
+
+                // 3. Mentions processing
+                await notificationService.ParseAndCreateMentionsAsync(content, threadId, created.Id, user);
+            }
+            catch
+            {
+                // Safe background failure handler
+            }
+        });
+
         return created;
     }
 

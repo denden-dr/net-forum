@@ -132,6 +132,20 @@ public class DevCurrentUserService : ICurrentUserService, IDisposable
             if (TestIsAuthenticated.HasValue) return TestIsAuthenticated.Value;
 
             var user = GetPrincipal();
+
+            // Do not apply the default developer authentication fallback on authentication pages/endpoints
+            var context = _httpContextAccessor?.HttpContext;
+            if (context != null)
+            {
+                var path = context.Request.Path.Value ?? "";
+                if (path.StartsWith("/login", StringComparison.OrdinalIgnoreCase) || 
+                    path.StartsWith("/register", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("/api/auth", StringComparison.OrdinalIgnoreCase))
+                {
+                    return user?.Identity?.IsAuthenticated ?? false;
+                }
+            }
+
             return user?.Identity?.IsAuthenticated ?? true;
         }
         set => TestIsAuthenticated = value;

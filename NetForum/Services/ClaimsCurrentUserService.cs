@@ -4,17 +4,50 @@ using NetForum.Data;
 
 namespace NetForum.Services;
 
-public class ClaimsCurrentUserService : ICurrentUserService
+public class ClaimsCurrentUserService : ICurrentUserService, IDisposable
 {
     private readonly AuthenticationStateProvider? _authStateProvider;
     private readonly IHttpContextAccessor? _httpContextAccessor;
+    private readonly ILogger<ClaimsCurrentUserService> _logger;
+    private ClaimsPrincipal? _cachedPrincipal;
 
     public ClaimsCurrentUserService(
         AuthenticationStateProvider authStateProvider,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        ILogger<ClaimsCurrentUserService> logger)
     {
         _authStateProvider = authStateProvider;
         _httpContextAccessor = httpContextAccessor;
+        _logger = logger;
+
+        // 1. Initialize immediately with HTTP context user if available
+        var httpUser = _httpContextAccessor?.HttpContext?.User;
+        if (httpUser?.Identity?.IsAuthenticated == true)
+        {
+            _cachedPrincipal = httpUser;
+        }
+
+        // 2. Subscribe to AuthenticationStateProvider changes and perform non-blocking initialization
+        if (_authStateProvider != null)
+        {
+            _authStateProvider.AuthenticationStateChanged += OnAuthStateChanged;
+
+            _authStateProvider.GetAuthenticationStateAsync().ContinueWith(task =>
+            {
+                if (task.IsFaulted)
+                {
+                    _logger.LogError(task.Exception, "Error loading initial authentication state asynchronously.");
+                }
+                else if (task.IsCompletedSuccessfully)
+                {
+                    var user = task.Result.User;
+                    if (user?.Identity?.IsAuthenticated == true)
+                    {
+                        _cachedPrincipal = user;
+                    }
+                }
+            }, TaskScheduler.Current);
+        }
     }
 
     public Guid? UserId
@@ -77,22 +110,30 @@ public class ClaimsCurrentUserService : ICurrentUserService
             return contextUser;
         }
 
+        return _cachedPrincipal;
+    }
+
+    private void OnAuthStateChanged(Task<AuthenticationState> task)
+    {
+        task.ContinueWith(t =>
+        {
+            if (t.IsFaulted)
+            {
+                _logger.LogError(t.Exception, "Error updating authentication state after change event.");
+            }
+            else if (t.IsCompletedSuccessfully)
+            {
+                _cachedPrincipal = t.Result.User;
+            }
+        }, TaskScheduler.Current);
+    }
+
+    public void Dispose()
+    {
         if (_authStateProvider != null)
         {
-            try
-            {
-                var state = _authStateProvider.GetAuthenticationStateAsync().GetAwaiter().GetResult();
-                if (state.User.Identity?.IsAuthenticated == true)
-                {
-                    return state.User;
-                }
-            }
-            catch (Exception)
-            {
-                // Suppress exception
-            }
+            _authStateProvider.AuthenticationStateChanged -= OnAuthStateChanged;
         }
-
-        return null;
     }
 }
+

@@ -4,21 +4,63 @@ using NetForum.Data;
 
 namespace NetForum.Services;
 
-public class DevCurrentUserService : ICurrentUserService
+public class DevCurrentUserService : ICurrentUserService, IDisposable
 {
+    public const string DevFallbackUsername = "DevUser";
+
     private readonly AuthenticationStateProvider? _authStateProvider;
     private readonly IHttpContextAccessor? _httpContextAccessor;
+    private readonly ILogger<DevCurrentUserService> _logger;
+    private ClaimsPrincipal? _cachedPrincipal;
 
     public DevCurrentUserService()
     {
+        _logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<DevCurrentUserService>.Instance;
+    }
+
+    public DevCurrentUserService(ILogger<DevCurrentUserService> logger)
+    {
+        _logger = logger;
     }
 
     public DevCurrentUserService(
         AuthenticationStateProvider authStateProvider,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        ILogger<DevCurrentUserService> logger)
     {
         _authStateProvider = authStateProvider;
         _httpContextAccessor = httpContextAccessor;
+        _logger = logger;
+
+        // 1. Initialize immediately with HTTP context user if available
+        var httpUser = _httpContextAccessor?.HttpContext?.User;
+        if (httpUser?.Identity?.IsAuthenticated == true)
+        {
+            _cachedPrincipal = httpUser;
+        }
+
+        // 2. Subscribe to AuthenticationStateProvider changes and perform non-blocking initialization
+        if (_authStateProvider != null)
+        {
+            _authStateProvider.AuthenticationStateChanged += OnAuthStateChanged;
+
+            _authStateProvider.GetAuthenticationStateAsync().ContinueWith(task =>
+            {
+                if (task.IsFaulted)
+                {
+                    _logger.LogError(task.Exception,
+                        "Error loading initial authentication state asynchronously in development.");
+                }
+                else if (task.IsCompletedSuccessfully)
+                {
+                    var user = task.Result.User;
+                    if (user.Identity?.IsAuthenticated == true)
+                    {
+                        _cachedPrincipal = user;
+                    }
+                }
+            }, TaskScheduler.Current);
+        }
     }
 
     public Guid? TestUserId { get; set; }
@@ -33,7 +75,7 @@ public class DevCurrentUserService : ICurrentUserService
         get
         {
             if (TestUserId.HasValue) return TestUserId;
-            
+
             var user = GetPrincipal();
             if (user?.Identity?.IsAuthenticated == true)
             {
@@ -43,6 +85,7 @@ public class DevCurrentUserService : ICurrentUserService
                     return parsed;
                 }
             }
+
             return DevId;
         }
         set => TestUserId = value;
@@ -59,7 +102,8 @@ public class DevCurrentUserService : ICurrentUserService
             {
                 return user.Identity.Name ?? "Anonymous";
             }
-            return "DevUser";
+
+            return DevFallbackUsername;
         }
         set => TestUsername = value;
     }
@@ -75,6 +119,7 @@ public class DevCurrentUserService : ICurrentUserService
             {
                 return user.FindFirst(ClaimTypes.Role)?.Value ?? Roles.Member;
             }
+
             return Roles.Member;
         }
         set => TestRole = value;
@@ -100,22 +145,30 @@ public class DevCurrentUserService : ICurrentUserService
             return contextUser;
         }
 
+        return _cachedPrincipal;
+    }
+
+    private void OnAuthStateChanged(Task<AuthenticationState> task)
+    {
+        task.ContinueWith(t =>
+        {
+            if (t.IsFaulted)
+            {
+                _logger.LogError(t.Exception, "Error updating development authentication state after change event.");
+            }
+            else if (t.IsCompletedSuccessfully)
+            {
+                _cachedPrincipal = t.Result.User;
+            }
+        }, TaskScheduler.Current);
+    }
+
+    public void Dispose()
+    {
         if (_authStateProvider != null)
         {
-            try
-            {
-                var state = _authStateProvider.GetAuthenticationStateAsync().GetAwaiter().GetResult();
-                if (state.User.Identity?.IsAuthenticated == true)
-                {
-                    return state.User;
-                }
-            }
-            catch (Exception)
-            {
-                // Suppress exception during sync retrieval in background threads
-            }
+            _authStateProvider.AuthenticationStateChanged -= OnAuthStateChanged;
         }
-
-        return null;
     }
 }
+

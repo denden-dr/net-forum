@@ -42,7 +42,7 @@ public class HomeComponentTests : BunitContext
             Category = category,
             Title = "Testing Home Page Rendering",
             Content = "Beautiful Blazor Server design",
-            AuthorName = "Tester",
+            Author = new User { Id = Guid.NewGuid(), Username = "Tester", Email = "tester@example.com" },
             CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-5),
             Upvotes = 3,
             Posts = []

@@ -16,13 +16,20 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
 
 builder.Services.AddScoped<IForumRepository, ForumRepository>();
 builder.Services.AddScoped<IForumService, ForumService>();
-builder.Services.AddScoped<ICurrentUserService, DevCurrentUserService>();
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddScoped<ICurrentUserService, DevCurrentUserService>();
+}
+else
+{
+    builder.Services.AddScoped<ICurrentUserService, ClaimsCurrentUserService>();
+}
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddIdentity<User, IdentityRole<Guid>>(options => {
     options.SignIn.RequireConfirmedEmail = true;
-    options.Password.RequireDigit = false;
-    options.Password.RequiredLength = 6;
+    options.Password.RequireDigit = true;
+    options.Password.RequiredLength = 8;
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
 })
@@ -38,8 +45,8 @@ builder.Services.ConfigureApplicationCookie(options => {
 
 builder.Services.AddAuthentication()
     .AddGoogle(options => {
-        options.ClientId = "dummy-client-id"; // Configured locally / dummy for build
-        options.ClientSecret = "dummy-client-secret";
+        options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "dummy-client-id";
+        options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "dummy-client-secret";
     });
 
 // Add services to the container
@@ -47,6 +54,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
+
+
 
 // Configure the HTTP request pipeline
 if (!app.Environment.IsDevelopment())
@@ -133,5 +142,11 @@ app.MapGet("/api/auth/google-callback", async (
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// Seed developer user at runtime in Development environment only
+if (app.Environment.IsDevelopment())
+{
+    await app.SeedDevelopmentUserAsync();
+}
 
 app.Run();

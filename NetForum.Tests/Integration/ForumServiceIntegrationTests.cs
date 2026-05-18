@@ -17,8 +17,10 @@ public class ForumServiceIntegrationTests : IAsyncLifetime
     {
         _factory = new TestDbContextFactory(fixture.ConnectionString);
         var repository = new ForumRepository(_factory);
+        var notificationRepository = new NotificationRepository(_factory);
+        var notificationService = new NotificationService(notificationRepository);
         _currentUserService = new DevCurrentUserService();
-        _service = new ForumService(repository, _currentUserService);
+        _service = new ForumService(repository, notificationService, _currentUserService);
     }
 
     public async Task InitializeAsync()

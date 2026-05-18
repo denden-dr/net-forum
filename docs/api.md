@@ -18,13 +18,16 @@ public interface IForumService
     // Thread Operations
     Task<List<Thread>> GetThreadsAsync(int? categoryId = null, string? searchQuery = null);
     Task<Thread?> GetThreadByIdAsync(Guid threadId, bool incrementViewCount = false);
-    Task<Thread> CreateThreadAsync(int categoryId, string title, string content, string authorName);
+    Task<Thread> CreateThreadAsync(int categoryId, string title, string content);
     Task UpvoteThreadAsync(Guid threadId);
 
     // Post / Reply Operations
     Task<List<Post>> GetPostsForThreadAsync(Guid threadId);
-    Task<Post> CreatePostAsync(Guid threadId, string content, string authorName, Guid? replyToPostId = null);
+    Task<Post> CreatePostAsync(Guid threadId, string content, Guid? replyToPostId = null);
     Task UpvotePostAsync(Guid postId);
+
+    // Security & Identity Checking
+    Task<bool> IsCurrentEmailConfirmedAsync();
 }
 ```
 
@@ -58,12 +61,14 @@ public interface IForumService
 #### `GetThreadByIdAsync(Guid threadId, bool incrementViewCount = false)`
 * **Behavior:** Retrieves a thread by its unique GUID. If `incrementViewCount` is `true`, it atomically increments the view count by `1` and persists it.
 
-#### `CreateThreadAsync(int categoryId, string title, string content, string authorName)`
-* **Behavior:** Sanitizes inputs, trimming whitespace from `Title` and `Content`. If `authorName` is empty, it defaults to `"Anonymous"`.
-* **State Initializers:** Sets `CreatedAt` to UTC, `Views` to `0`, and `Upvotes` to `1` (which acts as the initial creator self-upvote).
+#### `CreateThreadAsync(int categoryId, string title, string content)`
+* **Behavior:** Resolves the current user's profile from the injected `ICurrentUserService`. Trims whitespace from `Title` and `Content`.
+* **Security Constraints:** Throws `UnauthorizedAccessException` if the current user is unauthenticated OR has an unverified email address.
+* **State Initializers:** Sets `AuthorId` to the active User's ID, `CreatedAt` to UTC, `Views` to `0`, and `Upvotes` to `1` (initial creator self-upvote).
 
 #### `UpvoteThreadAsync(Guid threadId)`
 * **Behavior:** Atomically increments the target thread's `Upvotes` count by `1`.
+* **Security Constraints:** Throws `UnauthorizedAccessException` if the current user is unauthenticated OR has an unverified email address.
 
 ---
 
@@ -73,13 +78,30 @@ public interface IForumService
 * **Behavior:** Returns all replies for a thread, including self-referencing links to parent quote blocks (`Include(p => p.ReplyToPost)`).
 * **Ordering:** Strictly sorted in ascending chronological order (`CreatedAt` ascending) to represent a natural discussion timeline.
 
-#### `CreatePostAsync(Guid threadId, string content, string authorName, Guid? replyToPostId = null)`
+#### `CreatePostAsync(Guid threadId, string content, Guid? replyToPostId = null)`
 * **Parameters:**
   * `replyToPostId` (Optional): GUID of the parent post being cited/quoted.
-* **Behavior:** Sanitizes and trims input text. If `authorName` is blank, it defaults to `"Anonymous"`.
+* **Behavior:** Resolves current user context. Sanitizes and trims input text.
+* **Security Constraints:** Throws `UnauthorizedAccessException` if the current user is unauthenticated OR has an unverified email address.
+* **State Initializers:** Sets `AuthorId` to the active User's ID, `CreatedAt` to UTC, and `Upvotes` to `1`.
 
 #### `UpvotePostAsync(Guid postId)`
 * **Behavior:** Atomically increments the reply's `Upvotes` count by `1`.
+* **Security Constraints:** Throws `UnauthorizedAccessException` if the current user is unauthenticated OR has an unverified email address.
+
+---
+
+### 4. Security & Identity Operations
+
+#### `IsCurrentEmailConfirmedAsync()`
+* **Behavior:** Queries the database to check if the currently authenticated user's `EmailConfirmed` field is `true`.
+* **Returns:** `true` if the current session is authenticated and email is verified; otherwise `false`.
+
+#### Registration & Email Verification Lifecycle Security
+Our authentication system enforces advanced state-of-the-art security measures during user registration and email validation:
+* **Token Invalidation on Re-generation**: To prevent double-verification links or replay attacks, requesting a new confirmation email automatically calls `UserManager.UpdateSecurityStampAsync(user)`. This instantly invalidates all previously generated confirmation link tokens for the user.
+* **Email Verification Rate Limiting (Spam Defense)**: Prevents abuse by restricting confirmation requests to **maximum 3 per 24 hours** per user. When exceeded, the registration flow intercepts the action and blocks the request with a rate limit message.
+* **Token Lifespan Restrictions**: The cryptographic data protection provider is configured with a strict, secure token lifespan limit after which tokens automatically expire and fail validation.
 
 ---
 

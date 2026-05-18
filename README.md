@@ -71,7 +71,7 @@ Create your database tables and seed core discussion categories automatically:
 make migration-update
 ```
 
-### 3. Run the Automated Tests (21 Tests!)
+### 3. Run the Automated Tests (47 Tests!)
 Verify all unit, component, and Postgres integration tests are passing using our fast Makefile targets:
 * **Run everything (Unit + Integration):**
   ```bash
@@ -97,7 +97,11 @@ Open **`http://localhost:5201`** in your browser to experience the forum!
 
 ## 🌟 Key Features
 
-1. **Dynamic Category Directory:** Sidebar layouts tracking active tags, icons, views, and chronological threads.
-2. **Cascading Upvote System:** C# state mutations for threads and replies with instant reactive UI increments.
-3. **Quoted Comment Threading:** linear comment timelines supporting self-referencing parent quotations.
-4. **Instant Keyword Filtering:** Fast case-insensitive search matching Thread Title and Content.
+1. **User Authentication & Role System:** Complete registration, interactive login, and secure session management backed by ASP.NET Core Identity and local PostgreSQL databases.
+2. **Interactive Email Verification:** Automatic generation of verification links printed directly to the development console. Interactive Blazor pages verify tokens and confirm accounts seamlessly.
+3. **Write Privilege Safety Locks:** Automatic service-level validation blocks threads/posts/upvotes for unverified email users.
+4. **Dev Fallback User Context:** High-productivity context fallback provider (`DevCurrentUserService`) ensuring local development workflows and automated mock testing run perfectly out-of-the-box.
+5. **Dynamic Category Directory:** Sidebar layouts tracking active tags, icons, views, and chronological threads.
+6. **Cascading Upvote System:** C# state mutations for threads and replies with instant reactive UI increments.
+7. **Quoted Comment Threading:** Linear comment timelines supporting self-referencing parent quotations.
+8. **Instant Keyword Filtering:** Fast case-insensitive search matching Thread Title and Content.

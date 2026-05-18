@@ -15,6 +15,10 @@ This file contains strict instructions, developer shortcuts, and context rules f
     *   **Entity Framework Core** for schema definition, relationships, and migrations.
     *   Use `IDbContextFactory<AppDbContext>` injected in services for thread-safe concurrent database access under Blazor Server.
     *   No REST Controllers, endpoints, or DTO models are allowed for internal data. Blazor components must **directly inject** and query `IForumService` in C#.
+*   **Authentication & Current User Context:**
+    *   Powered by **ASP.NET Core Identity** mapped to local PostgreSQL tables.
+    *   Active user context (Id, Username, Role, and Authentication State) must be resolved implicitly via the **`ICurrentUserService`** service interface.
+    *   Local development fallbacks are provided dynamically via `DevCurrentUserService` pointing to a seeded developer profile (`00000000-0000-0000-0000-000000000001`).
 *   **UI System (Vanilla Light Mode):**
     *   Minimalist, professional, high-contrast Light Mode theme.
     *   *Variables:* `--bg-primary: #f8fafc;`, `--bg-card: #ffffff;`, `--text-primary: #0f172a;`, `--accent: #4f46e5;` (Indigo).
@@ -69,4 +73,6 @@ Use these fast `make` commands from the repository root for developer workflows:
 
 *   **No Placeholders:** Never write `// TODO`, `// implement later`, or stub out error handling inside files.
 *   **No Direct DB Access in Components:** Blazor Razor components should never inject `AppDbContext` or use EF Core directly. They must interact only with `IForumService` services.
+*   **No Direct Claims or HttpContext Queries in Services:** Business logic services must never retrieve active user identity fields directly from `IHttpContextAccessor` or `AuthenticationStateProvider`. They must query `ICurrentUserService` exclusively.
+*   **No Unsecured Write Privileges:** Never allow thread/post creation or voting operations to bypass authentication and email verification state validations.
 *   **No Dark Mode components:** Do not write dark theme variables or toggles unless explicitly requested by the user. All elements must default to the defined Light Mode palette.

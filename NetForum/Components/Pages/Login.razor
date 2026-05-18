@@ -1,7 +1,5 @@
 @page "/login"
 @rendermode InteractiveServer
-@using NetForum.Data.Entities
-@using Microsoft.AspNetCore.Identity
 @inject NavigationManager Nav
 
 <PageTitle>NetForum - Log In</PageTitle>
@@ -16,13 +14,14 @@
         }
 
         <form action="/api/auth/login" method="post">
+            <AntiforgeryToken/>
             <div class="mb-3">
                 <label class="form-label small fw-semibold text-secondary">Username or Email</label>
-                <input type="text" name="username" class="form-control py-2" placeholder="dev@netforum.com" style="border-radius: 8px;" />
+                <input type="text" name="username" class="form-control py-2" placeholder="dev@netforum.com" style="border-radius: 8px;"/>
             </div>
             <div class="mb-3">
                 <label class="form-label small fw-semibold text-secondary">Password</label>
-                <input type="password" name="password" class="form-control py-2" placeholder="••••••••" style="border-radius: 8px;" />
+                <input type="password" name="password" class="form-control py-2" placeholder="••••••••" style="border-radius: 8px;"/>
             </div>
 
             <button type="submit" class="btn text-white w-100 py-2 mb-3 fw-semibold" style="background-color: var(--accent); border-radius: 8px;">
@@ -58,6 +57,10 @@
                 "GoogleAccountRegistered" => "This email is registered with a Google account. Please click 'Continue with Google' to sign in.",
                 _ => "Invalid credentials or login attempt."
             };
+
+            // Instantly clear query parameters from the browser address bar
+            Nav.NavigateTo("/login", replace: true);
         }
     }
+
 }

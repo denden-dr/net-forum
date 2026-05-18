@@ -1,0 +1,55 @@
+@page "/verify-email"
+@rendermode InteractiveServer
+@using NetForum.Data.Entities
+@using Microsoft.AspNetCore.Identity
+@inject UserManager<User> UserManager
+@inject NavigationManager Nav
+
+<PageTitle>NetForum - Verify Email</PageTitle>
+
+<div class="container py-5 d-flex justify-content-center">
+    <div class="premium-card p-4 border text-center" style="max-width: 450px; width: 100%; border-radius: 16px; background-color: var(--bg-card); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+        @if (_verifying)
+        {
+            <div class="spinner-border text-primary my-3" role="status"></div>
+            <h5 class="fw-semibold text-primary">Verifying your email...</h5>
+        }
+        else if (_success)
+        {
+            <i class="bi bi-patch-check-fill text-success display-4 mb-3 d-block"></i>
+            <h4 class="fw-bold text-success mb-2">Email Confirmed!</h4>
+            <p class="text-secondary small mb-4">Your account is now fully unlocked. You can start discussions and reply to threads.</p>
+            <a href="/login" class="btn text-white py-2 px-4 fw-semibold" style="background-color: var(--accent); border-radius: 8px;">Go to Sign In</a>
+        }
+        else
+        {
+            <i class="bi bi-exclamation-triangle-fill text-danger display-4 mb-3 d-block"></i>
+            <h4 class="fw-bold text-danger mb-2">Verification Failed</h4>
+            <p class="text-secondary small mb-4">The verification link is invalid, expired, or corrupted.</p>
+            <a href="/register" class="btn btn-light py-2 px-4" style="border-radius: 8px;">Try Registering Again</a>
+        }
+    </div>
+</div>
+
+@code {
+    private bool _verifying = true;
+    private bool _success;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var queries = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (queries.TryGetValue("userId", out var uId) && queries.TryGetValue("token", out var tok))
+        {
+            var user = await UserManager.FindByIdAsync(uId.ToString());
+            if (user != null)
+            {
+                var result = await UserManager.ConfirmEmailAsync(user, tok.ToString());
+                _success = result.Succeeded;
+            }
+        }
+
+        _verifying = false;
+    }
+}

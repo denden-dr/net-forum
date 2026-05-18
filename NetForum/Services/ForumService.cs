@@ -4,95 +4,116 @@ using Thread = NetForum.Data.Entities.Thread;
 
 namespace NetForum.Services;
 
-public class ForumService : IForumService
+public class ForumService(IForumRepository repository, ICurrentUserService currentUserService) : IForumService
 {
-    private readonly IForumRepository _repository;
+    public Task<List<Category>> GetCategoriesAsync() => repository.GetCategoriesAsync();
 
-    public ForumService(IForumRepository repository)
-    {
-        _repository = repository;
-    }
+    public Task<Category?> GetCategoryBySlugAsync(string slug) => repository.GetCategoryBySlugAsync(slug);
 
-    public async Task<List<Category>> GetCategoriesAsync()
-    {
-        return await _repository.GetCategoriesAsync();
-    }
-
-    public async Task<Category?> GetCategoryBySlugAsync(string slug)
-    {
-        return await _repository.GetCategoryBySlugAsync(slug);
-    }
-
-    public async Task<List<Thread>> GetThreadsAsync(int? categoryId = null, string? searchQuery = null)
-    {
-        return await _repository.GetThreadsAsync(categoryId, searchQuery);
-    }
+    public Task<List<Thread>> GetThreadsAsync(int? categoryId = null, string? searchQuery = null) =>
+        repository.GetThreadsAsync(categoryId, searchQuery);
 
     public async Task<Thread?> GetThreadByIdAsync(Guid threadId, bool incrementViewCount = false)
     {
-        var thread = await _repository.GetThreadByIdAsync(threadId);
-
+        var thread = await repository.GetThreadByIdAsync(threadId);
         if (thread != null && incrementViewCount)
         {
             thread.Views++;
-            await _repository.UpdateThreadAsync(thread);
+            await repository.UpdateThreadAsync(thread);
         }
-
         return thread;
     }
 
-    public async Task<Thread> CreateThreadAsync(int categoryId, string title, string content, string authorName)
+    public Task<List<Post>> GetPostsForThreadAsync(Guid threadId) => repository.GetPostsForThreadAsync(threadId);
+
+    private async Task<User> EnsureEmailConfirmedAsync()
     {
+        if (!currentUserService.IsAuthenticated)
+        {
+            throw new UnauthorizedAccessException("User is not authenticated.");
+        }
+
+        var userId = currentUserService.UserId ?? throw new UnauthorizedAccessException("User ID is missing.");
+        var user = await repository.GetUserByIdAsync(userId) ?? throw new UnauthorizedAccessException("User profile not found.");
+
+        if (!user.EmailConfirmed)
+        {
+            throw new UnauthorizedAccessException("You must verify your email address before performing this action.");
+        }
+
+        return user;
+    }
+
+    public async Task<Thread> CreateThreadAsync(int categoryId, string title, string content)
+    {
+        var user = await EnsureEmailConfirmedAsync();
+
         var thread = new Thread
         {
             CategoryId = categoryId,
             Title = title.Trim(),
             Content = content.Trim(),
-            AuthorName = string.IsNullOrWhiteSpace(authorName) ? "Anonymous" : authorName.Trim(),
+            AuthorId = user.Id,
             CreatedAt = DateTimeOffset.UtcNow,
             Upvotes = 1 // Starts with 1 initial self-upvote
         };
 
-        return await _repository.CreateThreadAsync(thread);
+        var created = await repository.CreateThreadAsync(thread);
+        created.Author = user;
+        return created;
     }
 
     public async Task UpvoteThreadAsync(Guid threadId)
     {
-        var thread = await _repository.GetThreadByIdAsync(threadId);
+        await EnsureEmailConfirmedAsync();
+
+        var thread = await repository.GetThreadByIdAsync(threadId);
         if (thread != null)
         {
             thread.Upvotes++;
-            await _repository.UpdateThreadAsync(thread);
+            await repository.UpdateThreadAsync(thread);
         }
     }
 
-    public async Task<List<Post>> GetPostsForThreadAsync(Guid threadId)
+    public async Task<Post> CreatePostAsync(Guid threadId, string content, Guid? replyToPostId = null)
     {
-        return await _repository.GetPostsForThreadAsync(threadId);
-    }
+        var user = await EnsureEmailConfirmedAsync();
 
-    public async Task<Post> CreatePostAsync(Guid threadId, string content, string authorName, Guid? replyToPostId = null)
-    {
         var post = new Post
         {
             ThreadId = threadId,
             Content = content.Trim(),
-            AuthorName = string.IsNullOrWhiteSpace(authorName) ? "Anonymous" : authorName.Trim(),
+            AuthorId = user.Id,
             ReplyToPostId = replyToPostId,
             CreatedAt = DateTimeOffset.UtcNow,
             Upvotes = 0
         };
 
-        return await _repository.CreatePostAsync(post);
+        var created = await repository.CreatePostAsync(post);
+        created.Author = user;
+        return created;
     }
 
     public async Task UpvotePostAsync(Guid postId)
     {
-        var post = await _repository.GetPostByIdAsync(postId);
+        await EnsureEmailConfirmedAsync();
+
+        var post = await repository.GetPostByIdAsync(postId);
         if (post != null)
         {
             post.Upvotes++;
-            await _repository.UpdatePostAsync(post);
+            await repository.UpdatePostAsync(post);
         }
+    }
+
+    public async Task<bool> IsCurrentEmailConfirmedAsync()
+    {
+        if (!currentUserService.IsAuthenticated || !currentUserService.UserId.HasValue)
+        {
+            return false;
+        }
+
+        var user = await repository.GetUserByIdAsync(currentUserService.UserId.Value);
+        return user?.EmailConfirmed ?? false;
     }
 }

@@ -15,6 +15,7 @@ This file contains strict instructions, developer shortcuts, and context rules f
     *   **Entity Framework Core** for schema definition, relationships, and migrations.
     *   Use `IDbContextFactory<AppDbContext>` injected in services for thread-safe concurrent database access under Blazor Server.
     *   No REST Controllers, endpoints, or DTO models are allowed for internal data. Blazor components must **directly inject** and query `IForumService` in C#.
+    *   **Category Seeding:** Default categories are seeded programmatically at runtime in the development environment via `DbInitializer.SeedCategoriesAsync` (called during `app.SeedDevelopmentDataAsync()`) and during integration test setup (`TestDbContextFactory.cs`). They are not seeded via EF Core's `HasData` migrations.
 *   **Authentication & Current User Context:**
     *   Powered by **ASP.NET Core Identity** mapped to local PostgreSQL tables.
     *   Active user context (Id, Username, Role, and Authentication State) must be resolved implicitly via the **`ICurrentUserService`** service interface.

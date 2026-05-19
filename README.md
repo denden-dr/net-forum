@@ -70,7 +70,7 @@ make db-start
 ```
 
 ### 2. Apply Schema Migrations
-Create your database tables and seed core discussion categories automatically:
+Create your database tables:
 ```bash
 make migration-update
 ```
@@ -91,7 +91,7 @@ Verify all unit, component, and Postgres integration tests are passing using our
   ```
 
 ### 4. Start the Web Server
-Launch the Blazor host in development mode:
+Launch the Blazor host in development mode (this will automatically seed the default categories and development user profiles at runtime):
 ```bash
 make run
 ```

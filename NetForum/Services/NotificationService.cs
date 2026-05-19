@@ -6,7 +6,7 @@ namespace NetForum.Services;
 
 public class NotificationService(INotificationRepository repository) : INotificationService
 {
-    private static readonly Regex MentionRegex = new(@"\B@([a-zA-Z0-9_\-]+)\b", RegexOptions.Compiled);
+    private static readonly Regex MentionRegex = new(@"\B@([a-zA-Z0-9_\-]+)\b", RegexOptions.Compiled | RegexOptions.NonBacktracking);
 
     public Task<List<Notification>> GetNotificationsForUserAsync(Guid userId, int limit = 20) =>
         repository.GetNotificationsForUserAsync(userId, limit);
@@ -14,36 +14,14 @@ public class NotificationService(INotificationRepository repository) : INotifica
     public Task<int> GetUnreadNotificationCountAsync(Guid userId) =>
         repository.GetUnreadNotificationCountAsync(userId);
 
-    public Task MarkNotificationAsReadAsync(Guid notificationId)
+    public async Task MarkNotificationAsReadAsync(Guid notificationId)
     {
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await repository.MarkNotificationAsReadAsync(notificationId);
-            }
-            catch
-            {
-                // Silently catch background processing exceptions
-            }
-        });
-        return Task.CompletedTask;
+        await repository.MarkNotificationAsReadAsync(notificationId);
     }
 
-    public Task MarkAllNotificationsAsReadForUserAsync(Guid userId)
+    public async Task MarkAllNotificationsAsReadForUserAsync(Guid userId)
     {
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await repository.MarkAllNotificationsAsReadForUserAsync(userId);
-            }
-            catch
-            {
-                // Silently catch background processing exceptions
-            }
-        });
-        return Task.CompletedTask;
+        await repository.MarkAllNotificationsAsReadForUserAsync(userId);
     }
 
     public async Task ParseAndCreateMentionsAsync(string content, Guid threadId, Guid? postId, User sender)
@@ -69,7 +47,7 @@ public class NotificationService(INotificationRepository repository) : INotifica
         }
     }
 
-    public async Task CreateNotificationAsync(Guid recipientId, Guid senderId, Guid threadId, Guid? postId, string contentPreview)
+    public async Task CreateNotificationAsync(Guid recipientId, Guid senderId, Guid threadId, Guid? postId, string contentPreview, NotificationType type = NotificationType.Mention)
     {
         var notification = new Notification
         {
@@ -79,6 +57,7 @@ public class NotificationService(INotificationRepository repository) : INotifica
             PostId = postId,
             ContentPreview = contentPreview,
             IsRead = false,
+            Type = type,
             CreatedAt = DateTimeOffset.UtcNow
         };
 

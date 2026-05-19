@@ -35,5 +35,5 @@ public interface INotificationService
     /// <summary>
     /// Manually triggers and writes a new notification to the database.
     /// </summary>
-    Task CreateNotificationAsync(Guid recipientId, Guid senderId, Guid threadId, Guid? postId, string contentPreview);
+    Task CreateNotificationAsync(Guid recipientId, Guid senderId, Guid threadId, Guid? postId, string contentPreview, NotificationType type = NotificationType.Mention);
 }

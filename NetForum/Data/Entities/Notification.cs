@@ -2,6 +2,13 @@ using System.ComponentModel.DataAnnotations;
 
 namespace NetForum.Data.Entities;
 
+public enum NotificationType
+{
+    ThreadReply = 1,
+    QuoteReply = 2,
+    Mention = 3
+}
+
 public class Notification
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -25,6 +32,9 @@ public class Notification
     public string ContentPreview { get; set; } = string.Empty;
 
     public bool IsRead { get; set; } = false;
+
+    [Required]
+    public NotificationType Type { get; set; } = NotificationType.Mention;
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

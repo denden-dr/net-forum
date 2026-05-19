@@ -28,7 +28,7 @@ public class NotificationServiceUnitTests
         var threadId = Guid.NewGuid();
         
         _mockRepository.Setup(r => r.GetUsersByUsernamesAsync(It.IsAny<IEnumerable<string>>()))
-            .ReturnsAsync(new List<User> { recipient });
+            .ReturnsAsync([recipient]);
         
         Notification? capturedNotification = null;
         _mockRepository.Setup(r => r.CreateNotificationAsync(It.IsAny<Notification>()))
@@ -71,9 +71,6 @@ public class NotificationServiceUnitTests
         // Act
         await _service.MarkNotificationAsReadAsync(notifId);
 
-        // Wait briefly for background fire-and-forget task
-        await Task.Delay(100);
-
         // Assert
         _mockRepository.Verify(r => r.MarkNotificationAsReadAsync(notifId), Times.Once);
     }
@@ -87,9 +84,6 @@ public class NotificationServiceUnitTests
 
         // Act
         await _service.MarkAllNotificationsAsReadForUserAsync(userId);
-
-        // Wait briefly for background fire-and-forget task
-        await Task.Delay(100);
 
         // Assert
         _mockRepository.Verify(r => r.MarkAllNotificationsAsReadForUserAsync(userId), Times.Once);
@@ -109,7 +103,7 @@ public class NotificationServiceUnitTests
         var threadId = Guid.NewGuid();
         
         _mockRepository.Setup(r => r.GetUsersByUsernamesAsync(It.IsAny<IEnumerable<string>>()))
-            .ReturnsAsync(new List<User> { recipient1, recipient2 });
+            .ReturnsAsync([recipient1, recipient2]);
             
         _mockRepository.Setup(r => r.CreateNotificationAsync(It.IsAny<Notification>()))
             .ReturnsAsync((Notification n) => n);
@@ -119,9 +113,15 @@ public class NotificationServiceUnitTests
 
         // Assert
         _mockRepository.Verify(r => r.GetUsersByUsernamesAsync(It.Is<IEnumerable<string>>(list => 
-            list.Contains("Recipient1") && list.Contains("Recipient2"))), Times.Once);
+            CheckUsernames(list))), Times.Once);
             
         _mockRepository.Verify(r => r.GetUserByUsernameAsync(It.IsAny<string>()), Times.Never);
         _mockRepository.Verify(r => r.CreateNotificationAsync(It.IsAny<Notification>()), Times.Exactly(2));
+    }
+
+    private static bool CheckUsernames(IEnumerable<string> list)
+    {
+        var materialized = list.ToList();
+        return materialized.Contains("Recipient1") && materialized.Contains("Recipient2");
     }
 }

@@ -6,7 +6,8 @@ namespace NetForum.Services;
 
 public class ForumService(
     IForumRepository repository,
-    INotificationService notificationService,
+    IServiceScopeFactory scopeFactory,
+    ILogger<ForumService> logger,
     ICurrentUserService currentUserService) : IForumService
 {
     public Task<List<Category>> GetCategoriesAsync() => repository.GetCategoriesAsync();
@@ -66,16 +67,23 @@ public class ForumService(
         var created = await repository.CreateThreadAsync(thread);
         created.Author = user;
 
+        // Capture closure variables safely
+        var contentCopy = content;
+        var threadIdCopy = created.Id;
+        var senderCopy = user;
+
         // Non-blocking fire-and-forget mentions processing
         _ = Task.Run(async () =>
         {
             try
             {
-                await notificationService.ParseAndCreateMentionsAsync(content, created.Id, null, user);
+                using var scope = scopeFactory.CreateScope();
+                var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
+                await notificationService.ParseAndCreateMentionsAsync(contentCopy, threadIdCopy, null, senderCopy);
             }
-            catch
+            catch (Exception ex)
             {
-                // Silently handle any background thread exceptions
+                logger.LogError(ex, "Background mention processing failed for thread {ThreadId}", threadIdCopy);
             }
         });
 
@@ -111,41 +119,55 @@ public class ForumService(
         var created = await repository.CreatePostAsync(post);
         created.Author = user;
 
+        // Capture closure variables safely
+        var contentCopy = content;
+        var threadIdCopy = threadId;
+        var postIdCopy = created.Id;
+        var replyToIdCopy = replyToPostId;
+        var senderCopy = user;
+
         // Fire-and-forget notifications processing
         _ = Task.Run(async () =>
         {
             try
             {
+                using var scope = scopeFactory.CreateScope();
+                var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
+                var bgRepo = scope.ServiceProvider.GetRequiredService<IForumRepository>();
+
                 // 1. Thread reply notification
-                var thread = await repository.GetThreadByIdAsync(threadId);
-                if (thread != null && thread.AuthorId != user.Id)
+                var threadEntity = await bgRepo.GetThreadByIdAsync(threadIdCopy);
+                if (threadEntity != null && threadEntity.AuthorId != senderCopy.Id)
                 {
-                    var snippet = content.Length > 60 ? content[..60] + "..." : content;
-                    var preview = $"{user.Username} replied to your thread: \"{snippet}\"";
-                    await notificationService.CreateNotificationAsync(thread.AuthorId, user.Id, threadId, created.Id,
-                        preview);
+                    var snippet = contentCopy.Length > 60 ? contentCopy[..60] + "..." : contentCopy;
+                    var preview = $"{senderCopy.Username} replied to your thread: \"{snippet}\"";
+                    await notificationService.CreateNotificationAsync(threadEntity.AuthorId, senderCopy.Id,
+                        threadIdCopy, postIdCopy,
+                        preview, NotificationType.ThreadReply);
                 }
 
                 // 2. Quote notification
-                if (replyToPostId.HasValue)
+                if (replyToIdCopy.HasValue)
                 {
-                    var parentPost = await repository.GetPostByIdAsync(replyToPostId.Value);
-                    if (parentPost != null && parentPost.AuthorId != user.Id &&
-                        (thread == null || parentPost.AuthorId != thread.AuthorId))
+                    var parentPost = await bgRepo.GetPostByIdAsync(replyToIdCopy.Value);
+                    if (parentPost != null && parentPost.AuthorId != senderCopy.Id &&
+                        (threadEntity == null || parentPost.AuthorId != threadEntity.AuthorId))
                     {
-                        var snippet = content.Length > 60 ? content[..60] + "..." : content;
-                        var preview = $"{user.Username} quoted your reply: \"{snippet}\"";
-                        await notificationService.CreateNotificationAsync(parentPost.AuthorId, user.Id, threadId,
-                            created.Id, preview);
+                        var snippet = contentCopy.Length > 60 ? contentCopy[..60] + "..." : contentCopy;
+                        var preview = $"{senderCopy.Username} quoted your reply: \"{snippet}\"";
+                        await notificationService.CreateNotificationAsync(parentPost.AuthorId, senderCopy.Id,
+                            threadIdCopy,
+                            postIdCopy, preview, NotificationType.QuoteReply);
                     }
                 }
 
                 // 3. Mentions processing
-                await notificationService.ParseAndCreateMentionsAsync(content, threadId, created.Id, user);
+                await notificationService.ParseAndCreateMentionsAsync(contentCopy, threadIdCopy, postIdCopy,
+                    senderCopy);
             }
-            catch
+            catch (Exception ex)
             {
-                // Safe background failure handler
+                logger.LogError(ex, "Background notification processing failed for post {PostId}", postIdCopy);
             }
         });
 

@@ -83,6 +83,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             .HasForeignKey(n => n.PostId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<Notification>()
+            .HasIndex(n => new { n.RecipientId, n.IsRead, n.CreatedAt });
+
         // Seed Core Categories
         modelBuilder.Entity<Category>().HasData(
             new Category { Id = 1, Name = "General", Description = "General chatter, discussions, and off-topic things.", Slug = "general", Icon = "bi-chat-left-dots", DisplayOrder = 1 },

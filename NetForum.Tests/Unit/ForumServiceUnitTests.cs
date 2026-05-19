@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NetForum.Data;
 using NetForum.Data.Entities;
@@ -19,7 +21,24 @@ public class ForumServiceUnitTests
         _mockRepository = new Mock<IForumRepository>();
         _mockNotificationService = new Mock<INotificationService>();
         _mockCurrentUserService = new Mock<ICurrentUserService>();
-        _service = new ForumService(_mockRepository.Object, _mockNotificationService.Object, _mockCurrentUserService.Object);
+        
+        var mockScopeFactory = new Mock<IServiceScopeFactory>();
+        var mockLogger = new Mock<ILogger<ForumService>>();
+
+        var mockScope = new Mock<IServiceScope>();
+        var mockServiceProvider = new Mock<IServiceProvider>();
+
+        mockServiceProvider.Setup(x => x.GetService(typeof(INotificationService))).Returns(_mockNotificationService.Object);
+        mockServiceProvider.Setup(x => x.GetService(typeof(IForumRepository))).Returns(_mockRepository.Object);
+
+        mockScope.Setup(x => x.ServiceProvider).Returns(mockServiceProvider.Object);
+        mockScopeFactory.Setup(x => x.CreateScope()).Returns(mockScope.Object);
+
+        _service = new ForumService(
+            _mockRepository.Object, 
+            mockScopeFactory.Object, 
+            mockLogger.Object, 
+            _mockCurrentUserService.Object);
     }
 
     [Fact]
@@ -471,7 +490,7 @@ public class ForumServiceUnitTests
         _mockRepository.Setup(r => r.GetThreadByIdAsync(threadId)).ReturnsAsync(thread);
         _mockRepository.Setup(r => r.CreatePostAsync(It.IsAny<Post>())).ReturnsAsync(post);
 
-        _mockNotificationService.Setup(n => n.CreateNotificationAsync(authorId, replierId, threadId, post.Id, It.IsAny<string>()))
+        _mockNotificationService.Setup(n => n.CreateNotificationAsync(authorId, replierId, threadId, post.Id, It.IsAny<string>(), NotificationType.ThreadReply))
             .Returns(Task.CompletedTask);
         _mockNotificationService.Setup(n => n.ParseAndCreateMentionsAsync("Normal reply text quoting @Someone", threadId, post.Id, replier))
             .Returns(Task.CompletedTask);
@@ -483,7 +502,7 @@ public class ForumServiceUnitTests
         await Task.Delay(100);
 
         // Assert
-        _mockNotificationService.Verify(n => n.CreateNotificationAsync(authorId, replierId, threadId, post.Id, It.IsAny<string>()), Times.Once);
+        _mockNotificationService.Verify(n => n.CreateNotificationAsync(authorId, replierId, threadId, post.Id, It.IsAny<string>(), NotificationType.ThreadReply), Times.Once);
         _mockNotificationService.Verify(n => n.ParseAndCreateMentionsAsync("Normal reply text quoting @Someone", threadId, post.Id, replier), Times.Once);
     }
 }

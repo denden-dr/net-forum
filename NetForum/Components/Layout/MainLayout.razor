@@ -149,6 +149,7 @@
     private int _unreadCount;
     private bool _dropdownOpen;
     private Timer? _pollingTimer;
+    private CancellationTokenSource? _cts;
 
     protected override async Task OnInitializedAsync()
     {
@@ -159,23 +160,37 @@
         {
             await LoadNotificationsAsync();
 
-            _pollingTimer = new Timer(async void (_) =>
+            _cts = new CancellationTokenSource();
+            _pollingTimer = new Timer((timerState) =>
             {
-                await InvokeAsync(async () =>
-                {
-                    if (CurrentUserService.IsAuthenticated && CurrentUserService.UserId.HasValue)
-                    {
-                        var newCount = await NotificationService.GetUnreadNotificationCountAsync(CurrentUserService.UserId.Value);
-                        if (newCount != _unreadCount)
-                        {
-                            _unreadCount = newCount;
-                            if (_dropdownOpen)
-                            {
-                                await LoadNotificationsAsync();
-                            }
+                if (_cts?.IsCancellationRequested == true) return;
 
-                            StateHasChanged();
+                _ = InvokeAsync(async () =>
+                {
+                    try
+                    {
+                        if (CurrentUserService.IsAuthenticated && CurrentUserService.UserId.HasValue)
+                        {
+                            var newCount = await NotificationService.GetUnreadNotificationCountAsync(CurrentUserService.UserId.Value);
+                            if (newCount != _unreadCount)
+                            {
+                                _unreadCount = newCount;
+                                if (_dropdownOpen)
+                                {
+                                    await LoadNotificationsAsync();
+                                }
+
+                                StateHasChanged();
+                            }
                         }
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Circuit was torn down safely, swallow
+                    }
+                    catch (Exception)
+                    {
+                        // Prevent unhandled async exceptions from crashing the host process
                     }
                 });
             }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
@@ -191,6 +206,8 @@
     public void Dispose()
     {
         Nav.LocationChanged -= OnLocationChanged;
+        _cts?.Cancel();
+        _cts?.Dispose();
         _pollingTimer?.Dispose();
     }
 

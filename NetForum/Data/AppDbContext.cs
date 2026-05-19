@@ -84,7 +84,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Notification>()
-            .HasIndex(n => new { n.RecipientId, n.IsRead, n.CreatedAt });
+            .HasIndex(n => new { n.RecipientId, n.CreatedAt, n.IsRead })
+            .IsDescending(false, true, false);
 
         // Seed Core Categories
         modelBuilder.Entity<Category>().HasData(

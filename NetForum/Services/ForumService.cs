@@ -135,10 +135,13 @@ public class ForumService(
                 var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
                 var bgRepo = scope.ServiceProvider.GetRequiredService<IForumRepository>();
 
+                var notifiedUserIds = new List<Guid>();
+
                 // 1. Thread reply notification
                 var threadEntity = await bgRepo.GetThreadByIdAsync(threadIdCopy);
                 if (threadEntity != null && threadEntity.AuthorId != senderCopy.Id)
                 {
+                    notifiedUserIds.Add(threadEntity.AuthorId);
                     var snippet = contentCopy.Length > 60 ? contentCopy[..60] + "..." : contentCopy;
                     var preview = $"{senderCopy.Username} replied to your thread: \"{snippet}\"";
                     await notificationService.CreateNotificationAsync(threadEntity.AuthorId, senderCopy.Id,
@@ -153,6 +156,7 @@ public class ForumService(
                     if (parentPost != null && parentPost.AuthorId != senderCopy.Id &&
                         (threadEntity == null || parentPost.AuthorId != threadEntity.AuthorId))
                     {
+                        notifiedUserIds.Add(parentPost.AuthorId);
                         var snippet = contentCopy.Length > 60 ? contentCopy[..60] + "..." : contentCopy;
                         var preview = $"{senderCopy.Username} quoted your reply: \"{snippet}\"";
                         await notificationService.CreateNotificationAsync(parentPost.AuthorId, senderCopy.Id,
@@ -163,7 +167,7 @@ public class ForumService(
 
                 // 3. Mentions processing
                 await notificationService.ParseAndCreateMentionsAsync(contentCopy, threadIdCopy, postIdCopy,
-                    senderCopy);
+                    senderCopy, notifiedUserIds);
             }
             catch (Exception ex)
             {

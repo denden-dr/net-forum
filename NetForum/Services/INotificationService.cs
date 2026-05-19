@@ -30,7 +30,7 @@ public interface INotificationService
     /// <summary>
     /// Parses text content for @mentions and triggers database notification records asynchronously.
     /// </summary>
-    Task ParseAndCreateMentionsAsync(string content, Guid threadId, Guid? postId, User sender);
+    Task ParseAndCreateMentionsAsync(string content, Guid threadId, Guid? postId, User sender, IEnumerable<Guid>? excludedUserIds = null);
 
     /// <summary>
     /// Manually triggers and writes a new notification to the database.

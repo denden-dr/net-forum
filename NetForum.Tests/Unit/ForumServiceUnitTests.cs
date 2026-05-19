@@ -492,7 +492,7 @@ public class ForumServiceUnitTests
 
         _mockNotificationService.Setup(n => n.CreateNotificationAsync(authorId, replierId, threadId, post.Id, It.IsAny<string>(), NotificationType.ThreadReply))
             .Returns(Task.CompletedTask);
-        _mockNotificationService.Setup(n => n.ParseAndCreateMentionsAsync("Normal reply text quoting @Someone", threadId, post.Id, replier))
+        _mockNotificationService.Setup(n => n.ParseAndCreateMentionsAsync("Normal reply text quoting @Someone", threadId, post.Id, replier, It.IsAny<IEnumerable<Guid>>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -503,6 +503,56 @@ public class ForumServiceUnitTests
 
         // Assert
         _mockNotificationService.Verify(n => n.CreateNotificationAsync(authorId, replierId, threadId, post.Id, It.IsAny<string>(), NotificationType.ThreadReply), Times.Once);
-        _mockNotificationService.Verify(n => n.ParseAndCreateMentionsAsync("Normal reply text quoting @Someone", threadId, post.Id, replier), Times.Once);
+        _mockNotificationService.Verify(n => n.ParseAndCreateMentionsAsync("Normal reply text quoting @Someone", threadId, post.Id, replier, It.IsAny<IEnumerable<Guid>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreatePostAsync_TriggersParseAndCreateMentionsAsync_WithThreadAndQuoteAuthorsExcluded()
+    {
+        // Arrange
+        var threadAuthorId = Guid.NewGuid();
+        var quoteAuthorId = Guid.NewGuid();
+        var replierId = Guid.NewGuid();
+        
+        var threadAuthor = new User { Id = threadAuthorId, Username = "ThreadAuthor", EmailConfirmed = true };
+        var quoteAuthor = new User { Id = quoteAuthorId, Username = "QuoteAuthor", EmailConfirmed = true };
+        var replier = new User { Id = replierId, Username = "Replier", EmailConfirmed = true };
+        
+        var threadId = Guid.NewGuid();
+        var thread = new Thread { Id = threadId, AuthorId = threadAuthorId, Author = threadAuthor };
+        
+        var parentPostId = Guid.NewGuid();
+        var parentPost = new Post { Id = parentPostId, ThreadId = threadId, AuthorId = quoteAuthorId, Author = quoteAuthor };
+        
+        var content = "This is a reply mentioning @ThreadAuthor and @QuoteAuthor and @SomeoneElse";
+        var post = new Post { Id = Guid.NewGuid(), ThreadId = threadId, AuthorId = replierId, Content = content, ReplyToPostId = parentPostId };
+
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(replierId);
+        _mockRepository.Setup(r => r.GetUserByIdAsync(replierId)).ReturnsAsync(replier);
+        _mockRepository.Setup(r => r.GetThreadByIdAsync(threadId)).ReturnsAsync(thread);
+        _mockRepository.Setup(r => r.GetPostByIdAsync(parentPostId)).ReturnsAsync(parentPost);
+        _mockRepository.Setup(r => r.CreatePostAsync(It.IsAny<Post>())).ReturnsAsync(post);
+
+        // Act
+        await _service.CreatePostAsync(threadId, content, parentPostId);
+        
+        // Wait briefly for background fire-and-forget task to complete
+        await Task.Delay(100);
+
+        // Assert
+        _mockNotificationService.Verify(n => n.ParseAndCreateMentionsAsync(
+            content, 
+            threadId, 
+            post.Id, 
+            replier, 
+            It.Is<IEnumerable<Guid>>(list => ContainsBoth(list, threadAuthorId, quoteAuthorId))
+        ), Times.Once);
+    }
+
+    private static bool ContainsBoth(IEnumerable<Guid> list, Guid threadAuthorId, Guid quoteAuthorId)
+    {
+        var materialized = list.ToList();
+        return materialized.Contains(threadAuthorId) && materialized.Contains(quoteAuthorId);
     }
 }

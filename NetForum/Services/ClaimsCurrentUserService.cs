@@ -41,7 +41,7 @@ public class ClaimsCurrentUserService : ICurrentUserService, IDisposable
                 else if (task.IsCompletedSuccessfully)
                 {
                     var user = task.Result.User;
-                    if (user?.Identity?.IsAuthenticated == true)
+                    if (user.Identity?.IsAuthenticated == true)
                     {
                         _cachedPrincipal = user;
                     }
@@ -63,6 +63,7 @@ public class ClaimsCurrentUserService : ICurrentUserService, IDisposable
                     return parsed;
                 }
             }
+
             return null;
         }
     }
@@ -76,6 +77,7 @@ public class ClaimsCurrentUserService : ICurrentUserService, IDisposable
             {
                 return user.Identity.Name ?? "Anonymous";
             }
+
             return "Anonymous";
         }
     }
@@ -89,6 +91,7 @@ public class ClaimsCurrentUserService : ICurrentUserService, IDisposable
             {
                 return user.FindFirst(ClaimTypes.Role)?.Value ?? Roles.Member;
             }
+
             return Roles.Member;
         }
     }

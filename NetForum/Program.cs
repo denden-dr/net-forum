@@ -15,6 +15,8 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<IForumRepository, ForumRepository>();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IForumService, ForumService>();
 if (builder.Environment.IsDevelopment())
 {
@@ -150,10 +152,10 @@ app.MapGet("/api/auth/google-callback", async (
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-// Seed developer user at runtime in Development environment only
+// Seed developer user and default categories at runtime in Development environment only
 if (app.Environment.IsDevelopment())
 {
-    await app.SeedDevelopmentUserAsync();
+    await app.SeedDevelopmentDataAsync();
 }
 
 app.Run();

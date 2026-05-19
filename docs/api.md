@@ -132,6 +132,49 @@ public interface IForumRepository
 }
 ```
 
+---
+
+## 🔔 The `INotificationService` Interface
+
+```csharp
+namespace NetForum.Services;
+
+public interface INotificationService
+{
+    Task<List<Notification>> GetNotificationsForUserAsync(Guid userId, int limit = 20);
+    Task<int> GetUnreadNotificationCountAsync(Guid userId);
+    Task MarkNotificationAsReadAsync(Guid notificationId);
+    Task MarkAllNotificationsAsReadForUserAsync(Guid userId);
+    Task ParseAndCreateMentionsAsync(string content, Guid threadId, Guid? postId, User sender);
+    Task CreateNotificationAsync(Guid recipientId, Guid senderId, Guid threadId, Guid? postId, string contentPreview);
+}
+```
+
+### Method Specifications
+* **`GetNotificationsForUserAsync`**: Retrieves the list of notifications for a user, ordered from newest to oldest.
+* **`GetUnreadNotificationCountAsync`**: Fast database aggregation counting unread notifications (`IsRead == false`).
+* **`MarkNotificationAsReadAsync`**: Marks a single notification as read.
+* **`MarkAllNotificationsAsReadForUserAsync`**: Bulk updates all unread notifications for a user as read.
+* **`ParseAndCreateMentionsAsync`**: Extracts `@username` mentions from post/thread body contents and generates notification records asynchronously.
+* **`CreateNotificationAsync`**: Programmatically writes a notification record to the persistent layer.
+
+---
+
+## 🗄️ The `INotificationRepository` Interface
+
+```csharp
+namespace NetForum.Data.Repositories;
+
+public interface INotificationRepository
+{
+    Task<List<Notification>> GetNotificationsForUserAsync(Guid userId, int limit);
+    Task<int> GetUnreadNotificationCountAsync(Guid userId);
+    Task MarkNotificationAsReadAsync(Guid notificationId);
+    Task MarkAllNotificationsAsReadForUserAsync(Guid userId);
+    Task CreateNotificationAsync(Notification notification);
+}
+```
+
 #### Key Implementation Details
 * **Thread-Safe Factory Access:** Built utilizing `IDbContextFactory<AppDbContext>` to resolve concurrent websocket circuits dynamically.
 * **Async Disposals:** Employs `await using var context = ...` to release database resources asynchronously during context termination.

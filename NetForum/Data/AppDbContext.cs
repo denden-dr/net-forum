@@ -12,6 +12,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Thread> Threads => Set<Thread>();
     public DbSet<Post> Posts => Set<Post>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -57,12 +58,34 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             .HasForeignKey(p => p.AuthorId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Seed Core Categories
-        modelBuilder.Entity<Category>().HasData(
-            new Category { Id = 1, Name = "General", Description = "General chatter, discussions, and off-topic things.", Slug = "general", Icon = "bi-chat-left-dots", DisplayOrder = 1 },
-            new Category { Id = 2, Name = "Programming", Description = "Discuss code, web development, algorithms, and tech stacks.", Slug = "programming", Icon = "bi-code-slash", DisplayOrder = 2 },
-            new Category { Id = 3, Name = "Q&A / Support", Description = "Got a technical question? Ask the community for help.", Slug = "qa", Icon = "bi-question-circle", DisplayOrder = 3 },
-            new Category { Id = 4, Name = "Announcements", Description = "Official updates, guidelines, and site news.", Slug = "announcements", Icon = "bi-megaphone", DisplayOrder = 4 }
-        );
+        // Configure Notification
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.Recipient)
+            .WithMany()
+            .HasForeignKey(n => n.RecipientId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.Sender)
+            .WithMany()
+            .HasForeignKey(n => n.SenderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.Thread)
+            .WithMany()
+            .HasForeignKey(n => n.ThreadId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.Post)
+            .WithMany()
+            .HasForeignKey(n => n.PostId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Notification>()
+            .HasIndex(n => new { n.RecipientId, n.CreatedAt, n.IsRead })
+            .IsDescending(false, true, false);
+
     }
 }

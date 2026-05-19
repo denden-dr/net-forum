@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetForum.Data;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NetForum.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260519035629_AddNotificationTypeAndCompositeIndex")]
+    partial class AddNotificationTypeAndCompositeIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -189,6 +192,44 @@ namespace NetForum.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Categories");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Description = "General chatter, discussions, and off-topic things.",
+                            DisplayOrder = 1,
+                            Icon = "bi-chat-left-dots",
+                            Name = "General",
+                            Slug = "general"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Description = "Discuss code, web development, algorithms, and tech stacks.",
+                            DisplayOrder = 2,
+                            Icon = "bi-code-slash",
+                            Name = "Programming",
+                            Slug = "programming"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Description = "Got a technical question? Ask the community for help.",
+                            DisplayOrder = 3,
+                            Icon = "bi-question-circle",
+                            Name = "Q&A / Support",
+                            Slug = "qa"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Description = "Official updates, guidelines, and site news.",
+                            DisplayOrder = 4,
+                            Icon = "bi-megaphone",
+                            Name = "Announcements",
+                            Slug = "announcements"
+                        });
                 });
 
             modelBuilder.Entity("NetForum.Data.Entities.Notification", b =>
@@ -231,8 +272,7 @@ namespace NetForum.Data.Migrations
 
                     b.HasIndex("ThreadId");
 
-                    b.HasIndex("RecipientId", "CreatedAt", "IsRead")
-                        .IsDescending(false, true, false);
+                    b.HasIndex("RecipientId", "IsRead", "CreatedAt");
 
                     b.ToTable("Notifications");
                 });

@@ -17,15 +17,29 @@ public class ForumServiceIntegrationTests : IAsyncLifetime
     {
         _factory = new TestDbContextFactory(fixture.ConnectionString);
         var repository = new ForumRepository(_factory);
+        var notificationRepository = new NotificationRepository(_factory);
+        var notificationService = new NotificationService(notificationRepository);
         _currentUserService = new DevCurrentUserService();
-        _service = new ForumService(repository, _currentUserService);
+
+        var mockScopeFactory = new Moq.Mock<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>();
+        var mockScope = new Moq.Mock<Microsoft.Extensions.DependencyInjection.IServiceScope>();
+        var mockProvider = new Moq.Mock<IServiceProvider>();
+        mockProvider.Setup(x => x.GetService(typeof(INotificationService))).Returns(notificationService);
+        mockProvider.Setup(x => x.GetService(typeof(IForumRepository))).Returns(repository);
+        mockScope.Setup(x => x.ServiceProvider).Returns(mockProvider.Object);
+        mockScopeFactory.Setup(x => x.CreateScope()).Returns(mockScope.Object);
+
+        var logger = new Moq.Mock<Microsoft.Extensions.Logging.ILogger<ForumService>>().Object;
+
+        _service = new ForumService(repository, mockScopeFactory.Object, logger, _currentUserService);
     }
 
     public async Task InitializeAsync()
     {
         await using var context = _factory.CreateDbContext();
         // Guarantees a 100% clean, empty slate BEFORE each test runs!
-        await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Posts\", \"Threads\", \"Users\" RESTART IDENTITY CASCADE;");
+        await context.Database.ExecuteSqlRawAsync(
+            "TRUNCATE TABLE \"Posts\", \"Threads\", \"Users\" RESTART IDENTITY CASCADE;");
     }
 
     public Task DisposeAsync()
@@ -99,7 +113,8 @@ public class ForumServiceIntegrationTests : IAsyncLifetime
         await SetCurrentUserAsync("Developer");
 
         // Act
-        var thread = await _service.CreateThreadAsync(1, "Blazor Server TDD", "Unit testing Blazor apps is easy with bUnit.");
+        var thread =
+            await _service.CreateThreadAsync(1, "Blazor Server TDD", "Unit testing Blazor apps is easy with bUnit.");
 
         // Assert
         Assert.NotNull(thread);
@@ -118,10 +133,10 @@ public class ForumServiceIntegrationTests : IAsyncLifetime
         // Create initial threads
         await SetCurrentUserAsync("Alice");
         await _service.CreateThreadAsync(1, "General Chit Chat", "Just checking in.");
-        
+
         await SetCurrentUserAsync("Bob");
         var t2 = await _service.CreateThreadAsync(2, "C# .NET 10 Web Development", "Discussing the latest features.");
-        
+
         await SetCurrentUserAsync("Charlie");
         var t3 = await _service.CreateThreadAsync(2, "Vite vs Webpack in ASP.NET", "Frontend comparison.");
 
@@ -194,7 +209,8 @@ public class ForumServiceIntegrationTests : IAsyncLifetime
 
         // Act 2: Create sub-reply quoting post1
         await SetCurrentUserAsync("Bob");
-        var post2 = await _service.CreatePostAsync(thread.Id, "> Alice said: This is the first post.\n\nI agree!", replyToPostId: post1.Id);
+        var post2 = await _service.CreatePostAsync(thread.Id, "> Alice said: This is the first post.\n\nI agree!",
+            replyToPostId: post1.Id);
         Assert.NotNull(post2);
         Assert.Equal(post1.Id, post2.ReplyToPostId);
     }
@@ -208,7 +224,7 @@ public class ForumServiceIntegrationTests : IAsyncLifetime
         // Create posts at slightly different times
         await SetCurrentUserAsync("Alice");
         var p1 = await _service.CreatePostAsync(thread.Id, "First reply");
-        
+
         await SetCurrentUserAsync("Bob");
         var p2 = await _service.CreatePostAsync(thread.Id, "Second reply");
 
@@ -226,7 +242,7 @@ public class ForumServiceIntegrationTests : IAsyncLifetime
     {
         await SetCurrentUserAsync("Author");
         var thread = await _service.CreateThreadAsync(1, "Thread", "Content");
-        
+
         await SetCurrentUserAsync("Bob");
         var post = await _service.CreatePostAsync(thread.Id, "Reply content");
 

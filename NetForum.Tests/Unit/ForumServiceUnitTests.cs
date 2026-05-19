@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NetForum.Data;
 using NetForum.Data.Entities;
@@ -10,14 +12,33 @@ namespace NetForum.Tests.Unit;
 public class ForumServiceUnitTests
 {
     private readonly Mock<IForumRepository> _mockRepository;
+    private readonly Mock<INotificationService> _mockNotificationService;
     private readonly Mock<ICurrentUserService> _mockCurrentUserService;
     private readonly ForumService _service;
 
     public ForumServiceUnitTests()
     {
         _mockRepository = new Mock<IForumRepository>();
+        _mockNotificationService = new Mock<INotificationService>();
         _mockCurrentUserService = new Mock<ICurrentUserService>();
-        _service = new ForumService(_mockRepository.Object, _mockCurrentUserService.Object);
+        
+        var mockScopeFactory = new Mock<IServiceScopeFactory>();
+        var mockLogger = new Mock<ILogger<ForumService>>();
+
+        var mockScope = new Mock<IServiceScope>();
+        var mockServiceProvider = new Mock<IServiceProvider>();
+
+        mockServiceProvider.Setup(x => x.GetService(typeof(INotificationService))).Returns(_mockNotificationService.Object);
+        mockServiceProvider.Setup(x => x.GetService(typeof(IForumRepository))).Returns(_mockRepository.Object);
+
+        mockScope.Setup(x => x.ServiceProvider).Returns(mockServiceProvider.Object);
+        mockScopeFactory.Setup(x => x.CreateScope()).Returns(mockScope.Object);
+
+        _service = new ForumService(
+            _mockRepository.Object, 
+            mockScopeFactory.Object, 
+            mockLogger.Object, 
+            _mockCurrentUserService.Object);
     }
 
     [Fact]
@@ -416,5 +437,122 @@ public class ForumServiceUnitTests
 
         // Assert
         Assert.True(result);
+    }
+
+    [Fact]
+    public async Task CreateThreadAsync_TriggersParseAndCreateMentionsAsync()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var user = new User { Id = userId, Username = "ThreadCreator", EmailConfirmed = true };
+        var categoryId = 1;
+        var title = "Blazor TDD Thread";
+        var content = "This is a post mentioning @SomeUser";
+        
+        var thread = new Thread { Id = Guid.NewGuid(), Title = title, Content = content, AuthorId = userId };
+
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
+        _mockRepository.Setup(r => r.GetUserByIdAsync(userId)).ReturnsAsync(user);
+        _mockRepository.Setup(r => r.CreateThreadAsync(It.IsAny<Thread>())).ReturnsAsync(thread);
+
+        _mockNotificationService.Setup(n => n.ParseAndCreateMentionsAsync(content, thread.Id, null, user))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var created = await _service.CreateThreadAsync(categoryId, title, content);
+
+        // Wait briefly for fire-and-forget background task
+        await Task.Delay(100);
+
+        // Assert
+        Assert.NotNull(created);
+        _mockNotificationService.Verify(n => n.ParseAndCreateMentionsAsync(content, created.Id, null, user), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreatePostAsync_WhenReplyingToThread_TriggersThreadAuthorNotificationAndMentions()
+    {
+        // Arrange
+        var authorId = Guid.NewGuid();
+        var replierId = Guid.NewGuid();
+        
+        var author = new User { Id = authorId, Username = "ThreadAuthor", EmailConfirmed = true };
+        var replier = new User { Id = replierId, Username = "Replier", EmailConfirmed = true };
+        
+        var threadId = Guid.NewGuid();
+        var thread = new Thread { Id = threadId, AuthorId = authorId, Author = author };
+        var post = new Post { Id = Guid.NewGuid(), ThreadId = threadId, AuthorId = replierId, Content = "Normal reply text quoting @Someone" };
+
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(replierId);
+        _mockRepository.Setup(r => r.GetUserByIdAsync(replierId)).ReturnsAsync(replier);
+        _mockRepository.Setup(r => r.GetThreadByIdAsync(threadId)).ReturnsAsync(thread);
+        _mockRepository.Setup(r => r.CreatePostAsync(It.IsAny<Post>())).ReturnsAsync(post);
+
+        _mockNotificationService.Setup(n => n.CreateNotificationAsync(authorId, replierId, threadId, post.Id, It.IsAny<string>(), NotificationType.ThreadReply))
+            .Returns(Task.CompletedTask);
+        _mockNotificationService.Setup(n => n.ParseAndCreateMentionsAsync("Normal reply text quoting @Someone", threadId, post.Id, replier, It.IsAny<IEnumerable<Guid>>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _service.CreatePostAsync(threadId, "Normal reply text quoting @Someone");
+        
+        // Wait briefly for background fire-and-forget task to complete
+        await Task.Delay(100);
+
+        // Assert
+        _mockNotificationService.Verify(n => n.CreateNotificationAsync(authorId, replierId, threadId, post.Id, It.IsAny<string>(), NotificationType.ThreadReply), Times.Once);
+        _mockNotificationService.Verify(n => n.ParseAndCreateMentionsAsync("Normal reply text quoting @Someone", threadId, post.Id, replier, It.IsAny<IEnumerable<Guid>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreatePostAsync_TriggersParseAndCreateMentionsAsync_WithThreadAndQuoteAuthorsExcluded()
+    {
+        // Arrange
+        var threadAuthorId = Guid.NewGuid();
+        var quoteAuthorId = Guid.NewGuid();
+        var replierId = Guid.NewGuid();
+        
+        var threadAuthor = new User { Id = threadAuthorId, Username = "ThreadAuthor", EmailConfirmed = true };
+        var quoteAuthor = new User { Id = quoteAuthorId, Username = "QuoteAuthor", EmailConfirmed = true };
+        var replier = new User { Id = replierId, Username = "Replier", EmailConfirmed = true };
+        
+        var threadId = Guid.NewGuid();
+        var thread = new Thread { Id = threadId, AuthorId = threadAuthorId, Author = threadAuthor };
+        
+        var parentPostId = Guid.NewGuid();
+        var parentPost = new Post { Id = parentPostId, ThreadId = threadId, AuthorId = quoteAuthorId, Author = quoteAuthor };
+        
+        var content = "This is a reply mentioning @ThreadAuthor and @QuoteAuthor and @SomeoneElse";
+        var post = new Post { Id = Guid.NewGuid(), ThreadId = threadId, AuthorId = replierId, Content = content, ReplyToPostId = parentPostId };
+
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(replierId);
+        _mockRepository.Setup(r => r.GetUserByIdAsync(replierId)).ReturnsAsync(replier);
+        _mockRepository.Setup(r => r.GetThreadByIdAsync(threadId)).ReturnsAsync(thread);
+        _mockRepository.Setup(r => r.GetPostByIdAsync(parentPostId)).ReturnsAsync(parentPost);
+        _mockRepository.Setup(r => r.CreatePostAsync(It.IsAny<Post>())).ReturnsAsync(post);
+
+        // Act
+        await _service.CreatePostAsync(threadId, content, parentPostId);
+        
+        // Wait briefly for background fire-and-forget task to complete
+        await Task.Delay(100);
+
+        // Assert
+        _mockNotificationService.Verify(n => n.ParseAndCreateMentionsAsync(
+            content, 
+            threadId, 
+            post.Id, 
+            replier, 
+            It.Is<IEnumerable<Guid>>(list => ContainsBoth(list, threadAuthorId, quoteAuthorId))
+        ), Times.Once);
+    }
+
+    private static bool ContainsBoth(IEnumerable<Guid> list, Guid threadAuthorId, Guid quoteAuthorId)
+    {
+        var materialized = list.ToList();
+        return materialized.Contains(threadAuthorId) && materialized.Contains(quoteAuthorId);
     }
 }

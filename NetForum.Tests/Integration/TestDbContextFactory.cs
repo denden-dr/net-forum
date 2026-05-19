@@ -40,7 +40,8 @@ public class PostgreSqlTestFixture : IAsyncLifetime
 
         await using var context = new AppDbContext(options);
         await context.Database.EnsureDeletedAsync();
-        await context.Database.EnsureCreatedAsync(); // Creates all tables and seeds default categories once
+        await context.Database.EnsureCreatedAsync(); // Creates all tables once
+        await DbInitializer.SeedCategoriesAsync(context); // Programmatically seed default categories
     }
 
     public async Task DisposeAsync()

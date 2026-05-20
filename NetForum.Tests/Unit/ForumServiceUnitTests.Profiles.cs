@@ -84,7 +84,7 @@ public partial class ForumServiceUnitTests
     }
 
     [Fact]
-    public async Task UpdateUserProfileAsync_WithAvatarStream_DeletesOldAvatarBeforeUploading()
+    public async Task UpdateUserProfileAsync_WithAvatarStream_DeletesOldAvatarAfterSuccessfulDatabaseUpdate()
     {
         // Arrange
         var userId = Guid.NewGuid();
@@ -95,19 +95,29 @@ public partial class ForumServiceUnitTests
         _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
         _mockRepository.Setup(r => r.GetUserByIdAsync(userId)).ReturnsAsync(user);
 
-        _mockStorageService.Setup(s => s.DeleteObjectByUrlAsync(oldAvatarUrl)).Returns(Task.CompletedTask);
+        var callOrder = new List<string>();
+
+        _mockStorageService.Setup(s => s.DeleteObjectByUrlAsync(oldAvatarUrl))
+            .Callback(() => callOrder.Add("delete"))
+            .Returns(Task.CompletedTask);
         _mockStorageService.Setup(s => s.UploadAvatarAsync(It.IsAny<Stream>(), "new-avatar.jpg", "image/jpeg"))
+            .Callback(() => callOrder.Add("upload"))
             .ReturnsAsync("http://minio:9000/netforum/avatars/new-guid.jpg");
-        _mockRepository.Setup(r => r.UpdateUserAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+        _mockRepository.Setup(r => r.UpdateUserAsync(It.IsAny<User>()))
+            .Callback(() => callOrder.Add("update-db"))
+            .Returns(Task.CompletedTask);
 
         // Act
         using var stream = new MemoryStream(new byte[1024]);
         await _service.UpdateUserProfileAsync("bio", stream, "new-avatar.jpg", "image/jpeg");
 
         // Assert
-        _mockStorageService.Verify(s => s.DeleteObjectByUrlAsync(oldAvatarUrl), Times.Once);
-        _mockStorageService.Verify(s => s.UploadAvatarAsync(It.IsAny<Stream>(), "new-avatar.jpg", "image/jpeg"), Times.Once);
+        Assert.Equal(3, callOrder.Count);
+        Assert.Equal("upload", callOrder[0]);
+        Assert.Equal("update-db", callOrder[1]);
+        Assert.Equal("delete", callOrder[2]);
     }
+
 
     [Fact]
     public async Task UpdateUserProfileAsync_WithoutAvatarStream_PreservesExistingAvatarUrl()
@@ -208,5 +218,39 @@ public partial class ForumServiceUnitTests
 
         // Assert
         Assert.True(result);
+    }
+
+    [Fact]
+    public async Task UpdateUserProfileAsync_WithNonSeekableStream_UploadsSuccessfully()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var user = new User { Id = userId, Username = "NonSeekableUser", EmailConfirmed = true };
+
+        _mockCurrentUserService.Setup(u => u.IsAuthenticated).Returns(true);
+        _mockCurrentUserService.Setup(u => u.UserId).Returns(userId);
+        _mockRepository.Setup(r => r.GetUserByIdAsync(userId)).ReturnsAsync(user);
+
+        _mockStorageService.Setup(s => s.UploadAvatarAsync(It.IsAny<Stream>(), "photo.jpg", "image/jpeg"))
+            .ReturnsAsync("http://minio:9000/netforum/avatars/new-guid.jpg");
+
+        _mockRepository.Setup(r => r.UpdateUserAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+
+        using var nonSeekableStream = new NonSeekableStream(new byte[1024]);
+
+        // Act
+        await _service.UpdateUserProfileAsync("bio", nonSeekableStream, "photo.jpg", "image/jpeg");
+
+        // Assert
+        Assert.Equal("http://minio:9000/netforum/avatars/new-guid.jpg", user.AvatarUrl);
+        _mockStorageService.Verify(s => s.UploadAvatarAsync(It.IsAny<Stream>(), "photo.jpg", "image/jpeg"), Times.Once);
+        _mockRepository.Verify(r => r.UpdateUserAsync(user), Times.Once);
+    }
+
+    private class NonSeekableStream : MemoryStream
+    {
+        public NonSeekableStream(byte[] buffer) : base(buffer) { }
+        public override long Length => throw new NotSupportedException();
+        public override bool CanSeek => false;
     }
 }

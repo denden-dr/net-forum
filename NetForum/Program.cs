@@ -3,6 +3,7 @@ using NetForum.Components;
 using NetForum.Data;
 using NetForum.Data.Repositories;
 using NetForum.Services;
+using Minio;
 using Microsoft.AspNetCore.Identity;
 using NetForum.Data.Entities;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +19,27 @@ builder.Services.AddScoped<IForumRepository, ForumRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IForumService, ForumService>();
+
+// MinIO / S3 Storage — all values required, fail fast on missing config
+var minioEndpoint = builder.Configuration["Storage:Endpoint"]
+    ?? throw new InvalidOperationException("Missing required configuration: Storage:Endpoint");
+var minioAccessKey = builder.Configuration["Storage:AccessKey"]
+    ?? throw new InvalidOperationException("Missing required configuration: Storage:AccessKey");
+var minioSecretKey = builder.Configuration["Storage:SecretKey"]
+    ?? throw new InvalidOperationException("Missing required configuration: Storage:SecretKey");
+var minioBucket = builder.Configuration["Storage:BucketName"]
+    ?? throw new InvalidOperationException("Missing required configuration: Storage:BucketName");
+var minioPublicUrl = builder.Configuration["Storage:PublicUrl"]
+    ?? throw new InvalidOperationException("Missing required configuration: Storage:PublicUrl");
+
+IMinioClient minioClient = new MinioClient()
+    .WithEndpoint(minioEndpoint)
+    .WithCredentials(minioAccessKey, minioSecretKey)
+    .Build();
+
+builder.Services.AddSingleton(minioClient);
+builder.Services.AddScoped<IStorageService>(sp =>
+    new S3StorageService(sp.GetRequiredService<IMinioClient>(), minioBucket, minioPublicUrl));
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddScoped<ICurrentUserService, DevCurrentUserService>();

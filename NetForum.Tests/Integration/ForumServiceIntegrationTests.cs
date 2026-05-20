@@ -30,8 +30,9 @@ public class ForumServiceIntegrationTests : IAsyncLifetime
         mockScopeFactory.Setup(x => x.CreateScope()).Returns(mockScope.Object);
 
         var logger = new Moq.Mock<Microsoft.Extensions.Logging.ILogger<ForumService>>().Object;
+        var mockStorage = new Moq.Mock<IStorageService>();
 
-        _service = new ForumService(repository, mockScopeFactory.Object, logger, _currentUserService);
+        _service = new ForumService(repository, mockScopeFactory.Object, logger, _currentUserService, mockStorage.Object);
     }
 
     public async Task InitializeAsync()

@@ -63,8 +63,24 @@ public interface IForumRepository
     /// </summary>
     Task<User?> GetUserByIdAsync(Guid userId);
 
+
     /// <summary>
-    /// Inserts a new user record into the database.
+    /// Fetches a user by username (case-insensitive).
     /// </summary>
-    Task<User> CreateUserAsync(User user);
+    Task<User?> GetUserByUsernameAsync(string username);
+
+    /// <summary>
+    /// Fetches the most recent threads authored by a user with offset pagination.
+    /// </summary>
+    Task<List<Thread>> GetRecentThreadsByUserAsync(Guid userId, int skip = 0, int count = 10);
+
+    /// <summary>
+    /// Fetches the most recent posts authored by a user with offset pagination.
+    /// </summary>
+    Task<List<Post>> GetRecentPostsByUserAsync(Guid userId, int skip = 0, int count = 10);
+
+    /// <summary>
+    /// Persists updates to an existing user entity (bio, avatar, etc).
+    /// </summary>
+    Task UpdateUserAsync(User user);
 }

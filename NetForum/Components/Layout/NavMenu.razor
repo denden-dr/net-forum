@@ -1,13 +1,20 @@
-@inject NetForum.Services.IForumService ForumService
+@inject Services.IForumService ForumService
+@inject Services.ICurrentUserService CurrentUserService
 
 <div class="d-flex flex-column">
     <h6 class="text-uppercase text-muted fw-bold mb-3 small px-2">Navigation</h6>
     <a href="/" class="sidebar-link mb-1">
         <i class="bi bi-chat-left-text"></i> All Discussions
     </a>
+    @if (CurrentUserService.IsAuthenticated)
+    {
+        <a href="/profile/@CurrentUserService.Username" class="sidebar-link mb-1">
+            <i class="bi bi-person"></i> My Profile
+        </a>
+    }
 
     <h6 class="text-uppercase text-muted fw-bold mt-4 mb-3 small px-2">Categories</h6>
-    @if (categories == null)
+    @if (_categories == null)
     {
         <div class="d-flex justify-content-center my-3">
             <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
@@ -15,7 +22,7 @@
     }
     else
     {
-        @foreach (var cat in categories)
+        @foreach (var cat in _categories)
         {
             <a href="/category/@cat.Slug" class="sidebar-link mb-1">
                 <i class="bi @cat.Icon" style="color: var(--accent);"></i>
@@ -26,10 +33,11 @@
 </div>
 
 @code {
-    private List<NetForum.Data.Entities.Category>? categories;
+    private List<Data.Entities.Category>? _categories;
 
     protected override async Task OnInitializedAsync()
     {
-        categories = await ForumService.GetCategoriesAsync();
+        _categories = await ForumService.GetCategoriesAsync();
     }
+
 }

@@ -21,6 +21,12 @@ public class User : IdentityUser<Guid>
     public int EmailConfirmationRequestsCount { get; set; } = 0;
     public DateTimeOffset? LastEmailConfirmationRequestAt { get; set; }
 
+    [MaxLength(500)]
+    public string? Bio { get; set; }
+
+    [MaxLength(2000)]
+    public string? AvatarUrl { get; set; }
+
     // EF Core Navigation Properties - Mapped dynamically by Entity Framework Core to define relationships.
     // Flagged as "unused" in static code analysis because we query authored threads/posts directly from their respective database context tables.
     // ReSharper disable UnusedAutoPropertyAccessor.Global

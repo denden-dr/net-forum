@@ -8,7 +8,8 @@ public class ForumService(
     IForumRepository repository,
     IServiceScopeFactory scopeFactory,
     ILogger<ForumService> logger,
-    ICurrentUserService currentUserService) : IForumService
+    ICurrentUserService currentUserService,
+    IStorageService storageService) : IForumService
 {
     public Task<List<Category>> GetCategoriesAsync() => repository.GetCategoriesAsync();
 
@@ -199,5 +200,68 @@ public class ForumService(
 
         var user = await repository.GetUserByIdAsync(currentUserService.UserId.Value);
         return user?.EmailConfirmed ?? false;
+    }
+
+    private static readonly HashSet<string> AllowedAvatarContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/png", "image/jpeg", "image/webp"
+    };
+
+    private const long MaxAvatarSizeBytes = 5 * 1024 * 1024; // 5 MB
+
+    public Task<User?> GetUserProfileAsync(string username) =>
+        repository.GetUserByUsernameAsync(username);
+
+    public Task<List<Thread>> GetRecentThreadsByUserAsync(Guid userId, int skip = 0, int count = 10) =>
+        repository.GetRecentThreadsByUserAsync(userId, skip, count);
+
+    public Task<List<Post>> GetRecentPostsByUserAsync(Guid userId, int skip = 0, int count = 10) =>
+        repository.GetRecentPostsByUserAsync(userId, skip, count);
+
+    public async Task UpdateUserProfileAsync(string? bio, Stream? avatarStream, string? avatarFileName,
+        string? avatarContentType)
+    {
+        var user = await EnsureEmailConfirmedAsync();
+        string? oldAvatarUrl = null;
+
+        // Server-side avatar validation
+        if (avatarStream != null)
+        {
+            long length;
+            Stream uploadStream = avatarStream;
+
+            try
+            {
+                length = avatarStream.Length;
+            }
+            catch (NotSupportedException)
+            {
+                var ms = new MemoryStream();
+                await avatarStream.CopyToAsync(ms);
+                ms.Position = 0;
+                uploadStream = ms;
+                length = ms.Length;
+            }
+
+            if (length > MaxAvatarSizeBytes)
+                throw new InvalidOperationException("Avatar file size must not exceed 5 MB.");
+
+            if (string.IsNullOrEmpty(avatarContentType) || !AllowedAvatarContentTypes.Contains(avatarContentType))
+                throw new InvalidOperationException("Avatar must be PNG, JPEG, or WebP.");
+
+            oldAvatarUrl = user.AvatarUrl;
+
+            var sanitizedFileName = Path.GetFileName(avatarFileName ?? "avatar.jpg");
+            user.AvatarUrl = await storageService.UploadAvatarAsync(uploadStream, sanitizedFileName, avatarContentType);
+        }
+
+        user.Bio = bio;
+        await repository.UpdateUserAsync(user);
+
+        // Delete old avatar from storage only after successful db write
+        if (!string.IsNullOrEmpty(oldAvatarUrl))
+        {
+            await storageService.DeleteObjectByUrlAsync(oldAvatarUrl);
+        }
     }
 }

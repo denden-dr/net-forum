@@ -1,0 +1,175 @@
+@page "/profile/{Username}"
+@rendermode InteractiveServer
+@using NetForum.Data.Entities
+@using NetForum.Services
+@inject IForumService ForumService
+@inject ICurrentUserService CurrentUserService
+
+<PageTitle>@Username's Profile — NetForum</PageTitle>
+
+@if (_user == null)
+{
+    <div class="d-flex justify-content-center my-5">
+        <div class="spinner-border text-primary" role="status" style="color: var(--accent) !important;"></div>
+    </div>
+}
+else
+{
+    <div class="container py-4">
+        <!-- Profile Header -->
+        <div class="card mb-4 p-4 shadow-sm border-0" style="border-radius: 12px; background: var(--bg-card);">
+            <div class="d-flex align-items-center flex-wrap gap-3">
+                @if (!string.IsNullOrEmpty(_user.AvatarUrl))
+                {
+                    <img src="@_user.AvatarUrl" class="rounded-circle me-2" width="128" height="128"
+                         alt="@_user.Username's avatar" style="object-fit: cover; border: 3px solid var(--border-color);"/>
+                }
+                else
+                {
+                    <div class="rounded-circle d-flex justify-content-center align-items-center me-2"
+                         style="width: 128px; height: 128px; font-size: 3rem; background: var(--bg-primary); color: var(--text-secondary); border: 3px solid var(--border-color);">
+                        <i class="bi bi-person-fill"></i>
+                    </div>
+                }
+                <div>
+                    <h1 class="h2 mb-1 fw-bold">@_user.Username</h1>
+                    <span class="badge px-2.5 py-1.5" style="background: var(--accent); color: #fff; border-radius: 6px; font-size: 0.8rem;">@_user.Role</span>
+                    <p class="text-muted mb-0 mt-2 small">
+                        <i class="bi bi-calendar3 me-1"></i>Joined @_user.CreatedAt.ToString("MMMM yyyy")
+                    </p>
+                </div>
+
+                @if (CurrentUserService.IsAuthenticated && CurrentUserService.Username == _user.Username)
+                {
+                    <div class="ms-auto">
+                        <a href="/settings/profile" class="btn btn-outline-secondary px-3 py-2" style="border-radius: 8px; font-size: 0.9rem; font-weight: 500;">
+                            <i class="bi bi-pencil me-1"></i>Edit Profile
+                        </a>
+                    </div>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(_user.Bio))
+            {
+                <div class="mt-4 pt-3" style="border-top: 1px solid var(--border-color);">
+                    <h5 class="fw-bold mb-2 small text-uppercase text-muted" style="letter-spacing: 0.05em;">About Me</h5>
+                    <p class="mb-0 text-dark" style="line-height: 1.6; white-space: pre-line;">@_user.Bio</p>
+                </div>
+            }
+        </div>
+
+        <!-- Activity Tabs -->
+        <ul class="nav nav-tabs border-bottom-0 mb-3" role="tablist" style="gap: 0.5rem;">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-4 py-2 border-0 fw-semibold @(_activeTab == "threads" ? "active text-primary" : "text-secondary")"
+                        style="border-radius: 8px; transition: background-color 0.15s; background-color: @(_activeTab == "threads" ? "var(--bg-card)" : "transparent"); color: @(_activeTab == "threads" ? "var(--accent) !important" : "var(--text-secondary)"); box-shadow: @(_activeTab == "threads" ? "var(--card-shadow)" : "none");"
+                        @onclick='() => _activeTab = "threads"' type="button">
+                    <i class="bi bi-chat-left-text me-1"></i>Recent Threads (@_threads.Count)
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-4 py-2 border-0 fw-semibold @(_activeTab == "replies" ? "active text-primary" : "text-secondary")"
+                        style="border-radius: 8px; transition: background-color 0.15s; background-color: @(_activeTab == "replies" ? "var(--bg-card)" : "transparent"); color: @(_activeTab == "replies" ? "var(--accent) !important" : "var(--text-secondary)"); box-shadow: @(_activeTab == "replies" ? "var(--card-shadow)" : "none");"
+                        @onclick='() => _activeTab = "replies"' type="button">
+                    <i class="bi bi-reply me-1"></i>Recent Replies (@_posts.Count)
+                </button>
+            </li>
+        </ul>
+
+        <div>
+            @if (_activeTab == "threads")
+            {
+                @if (_threads.Count == 0)
+                {
+                    <div class="card p-5 text-muted text-center border-0 shadow-sm" style="border-radius: 12px;">
+                        <i class="bi bi-chat-left-text text-muted display-4 mb-3"></i>
+                        <p class="mb-0">No threads posted yet.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex flex-column gap-3">
+                        @foreach (var thread in _threads)
+                        {
+                            <div class="premium-card d-flex align-items-center justify-content-between mb-0">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-1.5">
+                                        <span class="badge text-white px-2 py-1" style="background-color: var(--accent); border-radius: 6px; font-size: 0.7rem;">@(thread.Category?.Name ?? "General")</span>
+                                        <span class="text-muted small">• Posted @GetTimeAgo(thread.CreatedAt)</span>
+                                    </div>
+                                    <h5 class="fw-bold mb-0">
+                                        <a href="/thread/@thread.Id" class="text-decoration-none text-dark" style="transition: color 0.15s ease;">@thread.Title</a>
+                                    </h5>
+                                </div>
+                                <div class="text-muted small d-flex gap-3">
+                                    <span>
+                                        <i class="bi bi-eye me-1"></i>@thread.Views
+                                    </span>
+                                    <span>
+                                        <i class="bi bi-arrow-up me-1"></i>@thread.Upvotes
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                @if (_posts.Count == 0)
+                {
+                    <div class="card p-5 text-muted text-center border-0 shadow-sm" style="border-radius: 12px;">
+                        <i class="bi bi-reply text-muted display-4 mb-3"></i>
+                        <p class="mb-0">No replies posted yet.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex flex-column gap-3">
+                        @foreach (var post in _posts)
+                        {
+                            <div class="premium-card mb-0">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <small class="text-muted">
+                                        Reply in <a href="/thread/@post.ThreadId" class="fw-semibold text-decoration-none text-secondary">@(post.Thread?.Title ?? "Unknown Thread")</a>
+                                    </small>
+                                    <small class="text-muted">@GetTimeAgo(post.CreatedAt)</small>
+                                </div>
+                                <p class="mb-0 text-dark" style="line-height: 1.5; white-space: pre-line;">@(post.Content.Length > 200 ? post.Content[..200] + "..." : post.Content)</p>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Username { get; set; } = string.Empty;
+
+    private User? _user;
+    private List<Thread> _threads = new();
+    private List<Post> _posts = new();
+    private string _activeTab = "threads";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = await ForumService.GetUserProfileAsync(Username);
+        if (_user != null)
+        {
+            _threads = await ForumService.GetRecentThreadsByUserAsync(_user.Id);
+            _posts = await ForumService.GetRecentPostsByUserAsync(_user.Id);
+        }
+    }
+
+    private string GetTimeAgo(DateTimeOffset created)
+    {
+        var diff = DateTimeOffset.UtcNow - created;
+        if (diff.TotalDays >= 1) return $"{(int)diff.TotalDays}d ago";
+        if (diff.TotalHours >= 1) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalMinutes >= 1) return $"{(int)diff.TotalMinutes}m ago";
+        return "just now";
+    }
+
+}

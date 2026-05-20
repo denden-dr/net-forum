@@ -91,7 +91,7 @@ else
             <div class="flex-grow-1">
                 <div class="d-flex align-items-center gap-2 mb-1.5">
                     <span class="badge text-white px-2.5 py-1.5" style="background-color: var(--accent); border-radius: 6px; font-size: 0.75rem;">@t.Category?.Name</span>
-                    <span class="text-muted small">• Posted by @(t.Author?.Username ?? "Anonymous") • @GetTimeAgo(t.CreatedAt)</span>
+                    <span class="text-muted small">• Posted by <a href="/profile/@t.Author?.Username" class="text-decoration-none fw-semibold text-secondary">@(t.Author?.Username ?? "Anonymous")</a> • @GetTimeAgo(t.CreatedAt)</span>
                 </div>
                 <h4 class="fw-bold h5 mb-1.5">
                     <a href="/thread/@t.Id" class="text-decoration-none text-dark" style="transition: color 0.15s ease;">@t.Title</a>

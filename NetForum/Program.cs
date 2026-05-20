@@ -3,6 +3,7 @@ using NetForum.Components;
 using NetForum.Data;
 using NetForum.Data.Repositories;
 using NetForum.Services;
+using Minio;
 using Microsoft.AspNetCore.Identity;
 using NetForum.Data.Entities;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +19,22 @@ builder.Services.AddScoped<IForumRepository, ForumRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IForumService, ForumService>();
+
+// MinIO / S3 Storage
+var minioEndpoint = builder.Configuration["Storage:Endpoint"] ?? "localhost:9000";
+var minioAccessKey = builder.Configuration["Storage:AccessKey"] ?? "minioadmin";
+var minioSecretKey = builder.Configuration["Storage:SecretKey"] ?? "minioadmin";
+var minioBucket = builder.Configuration["Storage:BucketName"] ?? "netforum";
+var minioPublicUrl = builder.Configuration["Storage:PublicUrl"] ?? $"http://{minioEndpoint}";
+
+var minioClient = new MinioClient()
+    .WithEndpoint(minioEndpoint)
+    .WithCredentials(minioAccessKey, minioSecretKey)
+    .Build();
+
+builder.Services.AddSingleton<IMinioClient>(minioClient);
+builder.Services.AddScoped<IStorageService>(sp =>
+    new S3StorageService(sp.GetRequiredService<IMinioClient>(), minioBucket, minioPublicUrl));
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddScoped<ICurrentUserService, DevCurrentUserService>();

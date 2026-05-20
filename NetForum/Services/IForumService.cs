@@ -66,12 +66,12 @@ public interface IForumService
     /// <summary>
     /// Fetches the most recent threads authored by a user.
     /// </summary>
-    Task<List<Thread>> GetRecentThreadsByUserAsync(Guid userId);
+    Task<List<Thread>> GetRecentThreadsByUserAsync(Guid userId, int skip = 0, int count = 10);
 
     /// <summary>
     /// Fetches the most recent posts authored by a user.
     /// </summary>
-    Task<List<Post>> GetRecentPostsByUserAsync(Guid userId);
+    Task<List<Post>> GetRecentPostsByUserAsync(Guid userId, int skip = 0, int count = 10);
 
     /// <summary>
     /// Updates the current user's bio and optionally uploads a new avatar image.

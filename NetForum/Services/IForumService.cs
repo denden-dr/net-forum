@@ -57,4 +57,25 @@ public interface IForumService
     /// Checks if the current logged-in user's email is confirmed.
     /// </summary>
     Task<bool> IsCurrentEmailConfirmedAsync();
+
+    /// <summary>
+    /// Fetches a user profile by username (case-insensitive).
+    /// </summary>
+    Task<User?> GetUserProfileAsync(string username);
+
+    /// <summary>
+    /// Fetches the most recent threads authored by a user.
+    /// </summary>
+    Task<List<Thread>> GetRecentThreadsByUserAsync(Guid userId);
+
+    /// <summary>
+    /// Fetches the most recent posts authored by a user.
+    /// </summary>
+    Task<List<Post>> GetRecentPostsByUserAsync(Guid userId);
+
+    /// <summary>
+    /// Updates the current user's bio and optionally uploads a new avatar image.
+    /// Requires email-confirmed authentication. Preserves existing avatar when no new file is provided.
+    /// </summary>
+    Task UpdateUserProfileAsync(string? bio, Stream? avatarStream, string? avatarFileName, string? avatarContentType);
 }

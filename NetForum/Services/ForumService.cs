@@ -8,7 +8,8 @@ public class ForumService(
     IForumRepository repository,
     IServiceScopeFactory scopeFactory,
     ILogger<ForumService> logger,
-    ICurrentUserService currentUserService) : IForumService
+    ICurrentUserService currentUserService,
+    IStorageService storageService) : IForumService
 {
     public Task<List<Category>> GetCategoriesAsync() => repository.GetCategoriesAsync();
 
@@ -199,5 +200,42 @@ public class ForumService(
 
         var user = await repository.GetUserByIdAsync(currentUserService.UserId.Value);
         return user?.EmailConfirmed ?? false;
+    }
+
+    private static readonly HashSet<string> AllowedAvatarContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/png", "image/jpeg", "image/webp"
+    };
+
+    private const long MaxAvatarSizeBytes = 5 * 1024 * 1024; // 5 MB
+
+    public Task<User?> GetUserProfileAsync(string username) =>
+        repository.GetUserByUsernameAsync(username);
+
+    public Task<List<Thread>> GetRecentThreadsByUserAsync(Guid userId) =>
+        repository.GetRecentThreadsByUserAsync(userId);
+
+    public Task<List<Post>> GetRecentPostsByUserAsync(Guid userId) =>
+        repository.GetRecentPostsByUserAsync(userId);
+
+    public async Task UpdateUserProfileAsync(string? bio, Stream? avatarStream, string? avatarFileName, string? avatarContentType)
+    {
+        var user = await EnsureEmailConfirmedAsync();
+
+        // Server-side avatar validation
+        if (avatarStream != null)
+        {
+            if (avatarStream.Length > MaxAvatarSizeBytes)
+                throw new InvalidOperationException("Avatar file size must not exceed 5 MB.");
+
+            if (string.IsNullOrEmpty(avatarContentType) || !AllowedAvatarContentTypes.Contains(avatarContentType))
+                throw new InvalidOperationException("Avatar must be PNG, JPEG, or WebP.");
+
+            var sanitizedFileName = Path.GetFileName(avatarFileName ?? "avatar.jpg");
+            user.AvatarUrl = await storageService.UploadAvatarAsync(avatarStream, sanitizedFileName, avatarContentType);
+        }
+
+        user.Bio = bio;
+        await repository.UpdateUserAsync(user);
     }
 }

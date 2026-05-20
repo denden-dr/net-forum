@@ -28,6 +28,12 @@ public interface IForumService
 
     // Security & Identity Checking
     Task<bool> IsCurrentEmailConfirmedAsync();
+
+    // Profile Operations
+    Task<User?> GetUserProfileAsync(string username);
+    Task<List<Thread>> GetRecentThreadsByUserAsync(Guid userId, int skip = 0, int count = 10);
+    Task<List<Post>> GetRecentPostsByUserAsync(Guid userId, int skip = 0, int count = 10);
+    Task UpdateUserProfileAsync(string? bio, Stream? avatarStream, string? avatarFileName, string? avatarContentType);
 }
 ```
 
@@ -105,6 +111,31 @@ Our authentication system enforces advanced state-of-the-art security measures d
 
 ---
 
+### 5. Profile Management Operations
+
+#### `GetUserProfileAsync(string username)`
+* **Parameters:** `username` (case-insensitive username of the target user).
+* **Behavior:** Queries the database for the user profile matching the username.
+* **Returns:** The matching `User` entity, or `null` if not found.
+
+#### `GetRecentThreadsByUserAsync(Guid userId, int skip = 0, int count = 10)`
+* **Parameters:** `userId` (GUID of the author), `skip` (number of records to skip), `count` (number of records to retrieve).
+* **Behavior:** Fetches a page of threads created by the user, ordered by `CreatedAt` descending.
+
+#### `GetRecentPostsByUserAsync(Guid userId, int skip = 0, int count = 10)`
+* **Parameters:** `userId` (GUID of the author), `skip`, `count`.
+* **Behavior:** Fetches a page of posts (replies) created by the user, ordered by `CreatedAt` descending.
+
+#### `UpdateUserProfileAsync(string? bio, Stream? avatarStream, string? avatarFileName, string? avatarContentType)`
+* **Parameters:** `bio` (updated bio text), `avatarStream` (optional upload stream), `avatarFileName` (optional filename), `avatarContentType` (optional MIME type).
+* **Behavior:**
+  * Validates authentication and email verification status.
+  * Sanitizes and updates the user's `Bio` in the database.
+  * If a new avatar stream is provided, uploads it to storage, saves the new `AvatarUrl` to the database, and deletes the old avatar URL *only* after database updates succeed (to prevent broken links).
+  * Safely handles non-seekable input streams by copying them to `MemoryStream` when checking `Length`.
+
+---
+
 ## 🗄️ The `IForumRepository` Interface Contract
 
 Our persistence interface `IForumRepository` abstracts all raw database queries and mutations:
@@ -178,3 +209,21 @@ public interface INotificationRepository
 #### Key Implementation Details
 * **Thread-Safe Factory Access:** Built utilizing `IDbContextFactory<AppDbContext>` to resolve concurrent websocket circuits dynamically.
 * **Async Disposals:** Employs `await using var context = ...` to release database resources asynchronously during context termination.
+
+---
+
+## 📂 The `IStorageService` Interface
+
+```csharp
+namespace NetForum.Services;
+
+public interface IStorageService
+{
+    Task<string> UploadAvatarAsync(Stream fileStream, string fileName, string contentType);
+    Task DeleteObjectByUrlAsync(string objectUrl);
+}
+```
+
+### Method Specifications
+* **`UploadAvatarAsync`**: Uploads an avatar image file to the S3 bucket and returns its full public access URL.
+* **`DeleteObjectByUrlAsync`**: Deletes the storage object identified by its public URL. Safe no-op if the URL is null, empty, or does not exist.

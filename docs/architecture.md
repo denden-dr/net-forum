@@ -40,6 +40,26 @@ graph TD
 
 ---
 
+## 📂 File Storage Architecture (MinIO / S3)
+
+For uploading user avatars and other attachments, NetForum relies on S3-compatible cloud storage. In development and production environments, this is powered by **MinIO** or standard AWS S3.
+
+```mermaid
+graph TD
+    BlazorPages["Settings/Profile Page"] -->|Injects| ForumService["ForumService"]
+    ForumService -->|Injects| IStorageService["IStorageService <br/> Contract"]
+    IStorageService -->|Implemented by| S3StorageService["S3StorageService <br/> AWS SDK S3 client"]
+    S3StorageService -->|Uploads| MinIO[("MinIO Bucket")]
+```
+
+### Key Design and Implementation Choices:
+1. **Abstraction Layer (`IStorageService`):** Keeps storage engine details independent of the business service layer.
+2. **PostgreSQL Linkage:** The user profile entity holds a public access URL (`AvatarUrl`) string pointing to the uploaded file.
+3. **Safe Modification Ordering:** During profile updates, the system uploads the new image and commits the profile database entity *before* deleting the old avatar from storage. This guarantees that if the upload or DB commit fails, the user does not end up with a broken image link.
+4. **Stream Validation Fallback:** Accessing `stream.Length` can throw a `NotSupportedException` on non-seekable streams. When this happens, the system copies the stream into a seekable `MemoryStream` to perform length checks and upload.
+
+---
+
 ## 🗄️ PostgreSQL Database Entity Schema
 
 The database consists of five relational entities integrated under Entity Framework Core with Identity framework mappings, automatic cascading deletes, and unique indexes:
@@ -66,6 +86,8 @@ Represents registered users in the forum, complete with custom fields:
 * **`Role`** (`Roles` string/enum): Role-based permissions (`Member` or `Admin`).
 * **`EmailConfirmationRequestsCount`** (`int`): Count of confirmation/verification email requests to prevent spam.
 * **`LastEmailConfirmationRequestAt`** (`DateTimeOffset?`): Timestamp of the last confirmation request used for cooldown enforcement.
+* **`Bio`** (`string?`): Custom profile biographical details/description.
+* **`AvatarUrl`** (`string?`): Persistent public storage URL pointing to the user's uploaded avatar image.
 
 ### 2. `Category`
 Represents the top-level discussion boards.

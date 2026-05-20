@@ -212,13 +212,24 @@ public class ForumService(
     public Task<User?> GetUserProfileAsync(string username) =>
         repository.GetUserByUsernameAsync(username);
 
-    public Task<List<Thread>> GetRecentThreadsByUserAsync(Guid userId) =>
-        repository.GetRecentThreadsByUserAsync(userId);
+    public Task<List<Thread>> GetRecentThreadsByUserAsync(Guid userId)
+    {
+        throw new NotImplementedException();
+    }
 
-    public Task<List<Post>> GetRecentPostsByUserAsync(Guid userId) =>
-        repository.GetRecentPostsByUserAsync(userId);
+    public Task<List<Post>> GetRecentPostsByUserAsync(Guid userId)
+    {
+        throw new NotImplementedException();
+    }
 
-    public async Task UpdateUserProfileAsync(string? bio, Stream? avatarStream, string? avatarFileName, string? avatarContentType)
+    public Task<List<Thread>> GetRecentThreadsByUserAsync(Guid userId, int skip = 0, int count = 10) =>
+        repository.GetRecentThreadsByUserAsync(userId, skip, count);
+
+    public Task<List<Post>> GetRecentPostsByUserAsync(Guid userId, int skip = 0, int count = 10) =>
+        repository.GetRecentPostsByUserAsync(userId, skip, count);
+
+    public async Task UpdateUserProfileAsync(string? bio, Stream? avatarStream, string? avatarFileName,
+        string? avatarContentType)
     {
         var user = await EnsureEmailConfirmedAsync();
 
@@ -230,6 +241,12 @@ public class ForumService(
 
             if (string.IsNullOrEmpty(avatarContentType) || !AllowedAvatarContentTypes.Contains(avatarContentType))
                 throw new InvalidOperationException("Avatar must be PNG, JPEG, or WebP.");
+
+            // Delete old avatar from storage before uploading new one
+            if (!string.IsNullOrEmpty(user.AvatarUrl))
+            {
+                await storageService.DeleteObjectByUrlAsync(user.AvatarUrl);
+            }
 
             var sanitizedFileName = Path.GetFileName(avatarFileName ?? "avatar.jpg");
             user.AvatarUrl = await storageService.UploadAvatarAsync(avatarStream, sanitizedFileName, avatarContentType);

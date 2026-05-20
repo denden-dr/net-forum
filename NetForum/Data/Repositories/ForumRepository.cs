@@ -118,4 +118,41 @@ public class ForumRepository(IDbContextFactory<AppDbContext> contextFactory) : I
         await context.SaveChangesAsync();
         return user;
     }
+
+    public async Task<User?> GetUserByUsernameAsync(string username)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        var normalized = username.Trim().ToLower();
+        return await context.Users
+            .FirstOrDefaultAsync(u => u.UserName != null && u.UserName.ToLower() == normalized);
+    }
+
+    public async Task<List<Thread>> GetRecentThreadsByUserAsync(Guid userId, int count = 10)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        return await context.Threads
+            .Include(t => t.Category)
+            .Where(t => t.AuthorId == userId)
+            .OrderByDescending(t => t.CreatedAt)
+            .Take(count)
+            .ToListAsync();
+    }
+
+    public async Task<List<Post>> GetRecentPostsByUserAsync(Guid userId, int count = 10)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        return await context.Posts
+            .Include(p => p.Thread)
+            .Where(p => p.AuthorId == userId)
+            .OrderByDescending(p => p.CreatedAt)
+            .Take(count)
+            .ToListAsync();
+    }
+
+    public async Task UpdateUserAsync(User user)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        context.Users.Update(user);
+        await context.SaveChangesAsync();
+    }
 }

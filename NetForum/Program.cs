@@ -20,19 +20,24 @@ builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IForumService, ForumService>();
 
-// MinIO / S3 Storage
-var minioEndpoint = builder.Configuration["Storage:Endpoint"] ?? "localhost:9000";
-var minioAccessKey = builder.Configuration["Storage:AccessKey"] ?? "minioadmin";
-var minioSecretKey = builder.Configuration["Storage:SecretKey"] ?? "minioadmin";
-var minioBucket = builder.Configuration["Storage:BucketName"] ?? "netforum";
-var minioPublicUrl = builder.Configuration["Storage:PublicUrl"] ?? $"http://{minioEndpoint}";
+// MinIO / S3 Storage — all values required, fail fast on missing config
+var minioEndpoint = builder.Configuration["Storage:Endpoint"]
+    ?? throw new InvalidOperationException("Missing required configuration: Storage:Endpoint");
+var minioAccessKey = builder.Configuration["Storage:AccessKey"]
+    ?? throw new InvalidOperationException("Missing required configuration: Storage:AccessKey");
+var minioSecretKey = builder.Configuration["Storage:SecretKey"]
+    ?? throw new InvalidOperationException("Missing required configuration: Storage:SecretKey");
+var minioBucket = builder.Configuration["Storage:BucketName"]
+    ?? throw new InvalidOperationException("Missing required configuration: Storage:BucketName");
+var minioPublicUrl = builder.Configuration["Storage:PublicUrl"]
+    ?? throw new InvalidOperationException("Missing required configuration: Storage:PublicUrl");
 
-var minioClient = new MinioClient()
+IMinioClient minioClient = new MinioClient()
     .WithEndpoint(minioEndpoint)
     .WithCredentials(minioAccessKey, minioSecretKey)
     .Build();
 
-builder.Services.AddSingleton<IMinioClient>(minioClient);
+builder.Services.AddSingleton(minioClient);
 builder.Services.AddScoped<IStorageService>(sp =>
     new S3StorageService(sp.GetRequiredService<IMinioClient>(), minioBucket, minioPublicUrl));
 if (builder.Environment.IsDevelopment())

@@ -42,4 +42,26 @@ public class S3StorageService : IStorageService
 
         return $"{_publicBaseUrl}/{_bucketName}/{objectName}";
     }
+
+    public async Task DeleteObjectByUrlAsync(string objectUrl)
+    {
+        if (string.IsNullOrEmpty(objectUrl)) return;
+
+        var prefix = $"{_publicBaseUrl}/{_bucketName}/";
+        if (!objectUrl.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return;
+
+        var objectName = objectUrl[prefix.Length..];
+        if (string.IsNullOrEmpty(objectName)) return;
+
+        try
+        {
+            await _minioClient.RemoveObjectAsync(new RemoveObjectArgs()
+                .WithBucket(_bucketName)
+                .WithObject(objectName));
+        }
+        catch (Exception)
+        {
+            // Swallow - deletion failure should not block profile update
+        }
+    }
 }

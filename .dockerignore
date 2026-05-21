@@ -10,7 +10,6 @@
 **/.agents
 **/.antigravitycli
 **/docs
-**/*.md
 **/*.user
 **/*.DotSettings.user
 **/Makefile

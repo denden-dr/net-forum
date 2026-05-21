@@ -1,0 +1,11 @@
+# Build directories
+bin/
+obj/
+
+# System & Agent directories
+.git/
+.agents/
+.antigravitycli/
+
+# Exclude documentation from mapping
+*.md

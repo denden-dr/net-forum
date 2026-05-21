@@ -1,4 +1,4 @@
-.PHONY: build test test-unit test-integration run db-start db-stop db-status migration-add migration-update migration-remove
+.PHONY: build test test-unit test-integration run db-start db-stop db-status migration-add migration-update migration-remove compose-up compose-down compose-test-up compose-test-down compose-test-logs
 
 # Build & Restore
 build:
@@ -47,3 +47,20 @@ migration-update:
 # Remove the last migration that hasn't been applied
 migration-remove:
 	dotnet ef migrations remove -p NetForum/NetForum.csproj
+
+# Docker Compose — local dependencies only
+compose-up:
+	docker compose up -d
+
+compose-down:
+	docker compose down
+
+# Docker Compose — full stack (containerized app + dependencies)
+compose-test-up:
+	docker compose -f compose.test.yaml up --build -d
+
+compose-test-down:
+	docker compose -f compose.test.yaml down
+
+compose-test-logs:
+	docker compose -f compose.test.yaml logs -f app

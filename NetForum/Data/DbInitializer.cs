@@ -27,6 +27,7 @@ public static class DbInitializer
         {
             var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
             await using var context = await dbContextFactory.CreateDbContextAsync();
+            await context.Database.MigrateAsync();
             await SeedCategoriesAsync(context);
         }
 

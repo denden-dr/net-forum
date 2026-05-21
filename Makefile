@@ -1,3 +1,5 @@
+COMPOSE ?= docker compose
+
 .PHONY: build test test-unit test-integration run db-start db-stop db-status migration-add migration-update migration-remove compose-up compose-down compose-test-up compose-test-down compose-test-logs
 
 # Build & Restore
@@ -50,17 +52,17 @@ migration-remove:
 
 # Docker Compose — local dependencies only
 compose-up:
-	docker compose up -d
+	$(COMPOSE) up -d
 
 compose-down:
-	docker compose down
+	$(COMPOSE) down
 
 # Docker Compose — full stack (containerized app + dependencies)
 compose-test-up:
-	docker compose -f compose.test.yaml up --build -d
+	$(COMPOSE) -f compose.test.yaml up --build -d
 
 compose-test-down:
-	docker compose -f compose.test.yaml down
+	$(COMPOSE) -f compose.test.yaml down
 
 compose-test-logs:
-	docker compose -f compose.test.yaml logs -f app
+	$(COMPOSE) -f compose.test.yaml logs -f app

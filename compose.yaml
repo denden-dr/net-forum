@@ -39,6 +39,7 @@ services:
   # Create the default bucket automatically on first run
   minio-init:
     image: docker.io/minio/mc:RELEASE.2024-11-21T17-21-54Z
+    restart: "no" # One-shot bootstrap container
     depends_on:
       minio:
         condition: service_healthy

@@ -3,6 +3,7 @@ services:
     # No volume: test data is ephemeral and reset on each compose-down
     image: docker.io/library/postgres:18-alpine
     container_name: netforum-db-test
+    restart: "no" # Ephemeral test database
     environment:
       POSTGRES_DB: netforum_db
       POSTGRES_USER: postgres
@@ -19,6 +20,7 @@ services:
     # No volume: test uploads are ephemeral and reset on each compose-down
     image: docker.io/minio/minio:RELEASE.2024-11-07T00-52-20Z
     container_name: netforum-minio-test
+    restart: "no" # Ephemeral test storage
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -35,6 +37,7 @@ services:
   # Create the default bucket automatically on first run
   minio-init:
     image: docker.io/minio/mc:RELEASE.2024-11-21T17-21-54Z
+    restart: "no" # One-shot bootstrap container for tests
     depends_on:
       minio:
         condition: service_healthy
@@ -50,6 +53,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: netforum-app-test
+    restart: "no" # Ephemeral test application
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080

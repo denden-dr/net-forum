@@ -1,7 +1,10 @@
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using NetForum.Components.Pages;
+using NetForum.Services;
 using System.Collections.Generic;
 
 namespace NetForum.Tests.Unit;
@@ -19,6 +22,10 @@ public class LoginComponentTests : BunitContext
             .AddInMemoryCollection(inMemorySettings)
             .Build();
         Services.AddSingleton(configuration);
+
+        var mockCurrentUserService = new Mock<ICurrentUserService>();
+        mockCurrentUserService.Setup(s => s.IsAuthenticated).Returns(false);
+        Services.AddSingleton(mockCurrentUserService.Object);
 
         // Act
         var cut = Render<Login>();
@@ -44,6 +51,10 @@ public class LoginComponentTests : BunitContext
             .AddInMemoryCollection(inMemorySettings)
             .Build();
         Services.AddSingleton(configuration);
+
+        var mockCurrentUserService = new Mock<ICurrentUserService>();
+        mockCurrentUserService.Setup(s => s.IsAuthenticated).Returns(false);
+        Services.AddSingleton(mockCurrentUserService.Object);
 
         // Act
         var cut = Render<Login>();
@@ -73,6 +84,10 @@ public class LoginComponentTests : BunitContext
             .Build();
         Services.AddSingleton(configuration);
 
+        var mockCurrentUserService = new Mock<ICurrentUserService>();
+        mockCurrentUserService.Setup(s => s.IsAuthenticated).Returns(false);
+        Services.AddSingleton(mockCurrentUserService.Object);
+
         // Act
         var cut = Render<Login>();
 
@@ -82,5 +97,28 @@ public class LoginComponentTests : BunitContext
         
         var warningAlert = cut.Find(".alert-warning");
         Assert.Contains("Google OAuth is not configured for local development", warningAlert.TextContent);
+    }
+
+    [Fact]
+    public void LoginPage_WhenUserIsAuthenticated_RedirectsToRoot()
+    {
+        // Arrange
+        var inMemorySettings = new Dictionary<string, string?>();
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(inMemorySettings)
+            .Build();
+        Services.AddSingleton(configuration);
+
+        var mockCurrentUserService = new Mock<ICurrentUserService>();
+        mockCurrentUserService.Setup(s => s.IsAuthenticated).Returns(true);
+        Services.AddSingleton(mockCurrentUserService.Object);
+
+        var navMan = Services.GetRequiredService<NavigationManager>();
+
+        // Act
+        var cut = Render<Login>();
+
+        // Assert
+        Assert.Equal("http://localhost/", navMan.Uri);
     }
 }

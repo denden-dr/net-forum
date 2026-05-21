@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject NavigationManager Nav
 @inject Microsoft.Extensions.Configuration.IConfiguration Config
+@inject NetForum.Services.ICurrentUserService CurrentUserService
 
 <PageTitle>NetForum - Log In</PageTitle>
 
@@ -58,6 +59,12 @@
 
     protected override void OnInitialized()
     {
+        if (CurrentUserService.IsAuthenticated)
+        {
+            Nav.NavigateTo("/", replace: true);
+            return;
+        }
+
         var clientId = Config["Authentication:Google:ClientId"];
         _isGoogleConfigured = !string.IsNullOrEmpty(clientId) && clientId != "dummy-client-id";
 

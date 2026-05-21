@@ -1,6 +1,8 @@
-COMPOSE ?= docker compose
+# Auto-detect container engine (Docker or Podman)
+CONTAINER_ENGINE ?= $(shell command -v docker >/dev/null 2>&1 && echo "docker" || (command -v podman >/dev/null 2>&1 && echo "podman" || echo "docker"))
+COMPOSE ?= $(CONTAINER_ENGINE) compose
 
-.PHONY: build test test-unit test-integration run db-start db-stop db-status migration-add migration-update migration-remove compose-up compose-down compose-test-up compose-test-down compose-test-logs
+.PHONY: build test test-unit test-integration run migration-add migration-update migration-remove compose-up compose-down compose-test-up compose-test-down compose-test-logs
 
 # Build & Restore
 build:
@@ -21,18 +23,6 @@ test-integration:
 # Run Web Application locally
 run:
 	dotnet run --project NetForum/NetForum.csproj
-
-# Start development PostgreSQL 18 container (Podman)
-db-start:
-	podman start netforum-db || podman run --name netforum-db -p 5432:5432 -e POSTGRES_PASSWORD=postgres -d docker.io/library/postgres:18-alpine
-
-# Stop database container
-db-stop:
-	podman stop netforum-db
-
-# Check database container status
-db-status:
-	podman ps -a --filter name=netforum-db
 
 # Generate a new EF Core migration (Usage: make migration-add name=MyMigrationName)
 migration-add:

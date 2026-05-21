@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
 using NetForum.Data;
@@ -10,6 +11,7 @@ public class DevCurrentUserService : ICurrentUserService, IDisposable
 
     private readonly AuthenticationStateProvider? _authStateProvider;
     private readonly IHttpContextAccessor? _httpContextAccessor;
+    private readonly NavigationManager? _navigationManager;
     private readonly ILogger<DevCurrentUserService> _logger;
     private ClaimsPrincipal? _cachedPrincipal;
 
@@ -26,11 +28,13 @@ public class DevCurrentUserService : ICurrentUserService, IDisposable
     public DevCurrentUserService(
         AuthenticationStateProvider authStateProvider,
         IHttpContextAccessor httpContextAccessor,
-        ILogger<DevCurrentUserService> logger)
+        ILogger<DevCurrentUserService> logger,
+        NavigationManager? navigationManager = null)
     {
         _authStateProvider = authStateProvider;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
+        _navigationManager = navigationManager;
 
         // 1. Initialize immediately with HTTP context user if available
         var httpUser = _httpContextAccessor?.HttpContext?.User;
@@ -143,6 +147,25 @@ public class DevCurrentUserService : ICurrentUserService, IDisposable
                     path.StartsWith("/api/auth", StringComparison.OrdinalIgnoreCase))
                 {
                     return user?.Identity?.IsAuthenticated ?? false;
+                }
+            }
+
+            if (_navigationManager != null)
+            {
+                try
+                {
+                    var uri = new Uri(_navigationManager.Uri);
+                    var path = uri.AbsolutePath;
+                    if (path.StartsWith("/login", StringComparison.OrdinalIgnoreCase) || 
+                        path.StartsWith("/register", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/api/auth", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return user?.Identity?.IsAuthenticated ?? false;
+                    }
+                }
+                catch
+                {
+                    // Ignore URI parsing issues in test environments
                 }
             }
 

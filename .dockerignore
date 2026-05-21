@@ -1,0 +1,17 @@
+**/.git
+**/.vs
+**/.vscode
+**/.idea
+**/bin
+**/obj
+**/node_modules
+**/.gitignore
+**/graphify-out
+**/.agents
+**/.antigravitycli
+**/docs
+**/*.user
+**/*.DotSettings.user
+**/Makefile
+**/dotnet-tools.json
+**/NetForum.Tests

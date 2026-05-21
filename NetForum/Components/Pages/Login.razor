@@ -1,6 +1,7 @@
 @page "/login"
 @rendermode InteractiveServer
 @inject NavigationManager Nav
+@inject Microsoft.Extensions.Configuration.IConfiguration Config
 
 <PageTitle>NetForum - Log In</PageTitle>
 
@@ -29,9 +30,21 @@
             </button>
         </form>
 
-        <a href="/api/auth/google-login" class="btn btn-outline-dark w-100 py-2 mb-3 d-flex align-items-center justify-content-center gap-2 fw-semibold" style="border-radius: 8px;">
-            <i class="bi bi-google"></i> Continue with Google
-        </a>
+        @if (_isGoogleConfigured)
+        {
+            <a href="/api/auth/google-login" class="btn btn-outline-dark w-100 py-2 mb-3 d-flex align-items-center justify-content-center gap-2 fw-semibold" style="border-radius: 8px;">
+                <i class="bi bi-google"></i> Continue with Google
+            </a>
+        }
+        else
+        {
+            <button class="btn btn-outline-dark w-100 py-2 mb-3 d-flex align-items-center justify-content-center gap-2 fw-semibold" style="border-radius: 8px;" disabled title="Google OAuth is not configured.">
+                <i class="bi bi-google"></i> Continue with Google
+            </button>
+            <div class="alert alert-warning small py-2 px-3 mb-3 border-0 text-center" style="border-radius: 8px;">
+                Google OAuth is not configured for local development.
+            </div>
+        }
 
         <div class="text-center text-muted small">
             Don't have an account? <a href="/register" class="text-decoration-none" style="color: var(--accent); font-weight: 500;">Sign Up</a>
@@ -41,9 +54,13 @@
 
 @code {
     private string? _error;
+    private bool _isGoogleConfigured;
 
     protected override void OnInitialized()
     {
+        var clientId = Config["Authentication:Google:ClientId"];
+        _isGoogleConfigured = !string.IsNullOrEmpty(clientId) && clientId != "dummy-client-id";
+
         var uri = Nav.ToAbsoluteUri(Nav.Uri);
         if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("error", out var errVal))
         {

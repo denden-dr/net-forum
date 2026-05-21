@@ -486,3 +486,6 @@ graphify-out
 
 # User uploads
 wwwroot/uploads/
+
+# Antigravity-CLI
+.antigravitycli

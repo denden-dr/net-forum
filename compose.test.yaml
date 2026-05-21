@@ -59,10 +59,11 @@ services:
       - Storage__SecretKey=minioadmin
       - Storage__BucketName=netforum
       - Storage__PublicUrl=http://localhost:9002
+      # Dummy values for local testing — Google OAuth sign-in will error here
       - Authentication__Google__ClientId=dummy-client-id
       - Authentication__Google__ClientSecret=dummy-client-secret
     ports:
-      - "5201:8080"
+      - "5202:8080"
     depends_on:
       db:
         condition: service_healthy

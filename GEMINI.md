@@ -63,9 +63,8 @@ Use these fast `make` commands from the repository root for developer workflows:
 | **Build Project** | `make build` | `dotnet build` |
 | **Run Tests** | `make test` | `dotnet test` |
 | **Run Application** | `make run` | `dotnet run --project NetForum/NetForum.csproj` |
-| **Start Postgres** | `make db-start` | `podman start netforum-db` |
-| **Stop Postgres** | `make db-stop` | `podman stop netforum-db` |
-| **Postgres Status** | `make db-status` | `podman ps -a --filter name=netforum-db` |
+| **Start Dependencies** | `make compose-up` | `docker compose up -d` / `podman compose up -d` |
+| **Stop Dependencies** | `make compose-down` | `docker compose down` / `podman compose down` |
 | **Create Migration** | `make migration-add name=Name` | `dotnet ef migrations add Name -p NetForum/NetForum.csproj ...` |
 | **Apply Migrations** | `make migration-update` | `dotnet ef database update -p NetForum/NetForum.csproj` |
 | **Remove Migration** | `make migration-remove` | `dotnet ef migrations remove -p NetForum/NetForum.csproj` |

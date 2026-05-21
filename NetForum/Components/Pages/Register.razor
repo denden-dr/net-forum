@@ -6,6 +6,7 @@
 @inject UserManager<User> UserManager
 @inject NavigationManager Nav
 @inject ILogger<Register> Logger
+@inject NetForum.Services.ICurrentUserService CurrentUserService
 
 <PageTitle>NetForum - Create Account</PageTitle>
 
@@ -53,6 +54,14 @@
     private string _password = "";
     private string _errorMessage = "";
     private bool _registrationSuccess;
+
+    protected override void OnInitialized()
+    {
+        if (CurrentUserService.IsAuthenticated)
+        {
+            Nav.NavigateTo("/", replace: true);
+        }
+    }
 
     private async Task HandleRegistration()
     {

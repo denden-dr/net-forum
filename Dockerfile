@@ -28,6 +28,6 @@ WORKDIR /app
 COPY --from=publish /app/publish .
 
 # Run as non-root user for security
-USER $APP_UID
+USER 1654
 
 ENTRYPOINT ["dotnet", "NetForum.dll"]

@@ -1,5 +1,6 @@
 services:
   db:
+    # No volume: test data is ephemeral and reset on each compose-down
     image: docker.io/library/postgres:18-alpine
     container_name: netforum-db-test
     environment:
@@ -15,6 +16,7 @@ services:
       retries: 5
 
   minio:
+    # No volume: test uploads are ephemeral and reset on each compose-down
     image: docker.io/minio/minio:latest
     container_name: netforum-minio-test
     environment:

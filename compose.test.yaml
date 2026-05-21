@@ -17,7 +17,7 @@ services:
 
   minio:
     # No volume: test uploads are ephemeral and reset on each compose-down
-    image: docker.io/minio/minio:latest
+    image: docker.io/minio/minio:RELEASE.2024-11-07T00-52-20Z
     container_name: netforum-minio-test
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -34,7 +34,7 @@ services:
 
   # Create the default bucket automatically on first run
   minio-init:
-    image: docker.io/minio/mc:latest
+    image: docker.io/minio/mc:RELEASE.2024-11-21T17-21-54Z
     depends_on:
       minio:
         condition: service_healthy

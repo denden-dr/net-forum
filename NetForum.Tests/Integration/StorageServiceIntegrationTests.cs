@@ -21,7 +21,7 @@ public class StorageServiceIntegrationTests : IAsyncLifetime
         // ryuk resource reaper container requires privileged security contexts under rootless podman
         Environment.SetEnvironmentVariable("RYUK_CONTAINER_PRIVILEGED", "true");
 
-        _minioContainer = new MinioBuilder("minio/minio:latest")
+        _minioContainer = new MinioBuilder("minio/minio:RELEASE.2024-11-07T00-52-20Z")
             .WithUsername("minioadmin")
             .WithPassword("minioadmin")
             .Build();

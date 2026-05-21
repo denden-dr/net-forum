@@ -21,13 +21,20 @@ public static class DbInitializer
         }
     }
 
+    public static async Task MigrateDatabaseAsync(this WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        await context.Database.MigrateAsync();
+    }
+
     public static async Task SeedDevelopmentDataAsync(this WebApplication app)
     {
         using (var scope = app.Services.CreateScope())
         {
             var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
             await using var context = await dbContextFactory.CreateDbContextAsync();
-            await context.Database.MigrateAsync();
             await SeedCategoriesAsync(context);
         }
 

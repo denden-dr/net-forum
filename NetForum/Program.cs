@@ -174,9 +174,10 @@ app.MapGet("/api/auth/google-callback", async (
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-// Seed developer user and default categories at runtime in Development environment only
+// Apply migrations and seed data at runtime in Development environment only
 if (app.Environment.IsDevelopment())
 {
+    await app.MigrateDatabaseAsync();
     await app.SeedDevelopmentDataAsync();
 }
 

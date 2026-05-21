@@ -36,6 +36,7 @@ public class RegisterComponentTests : BunitContext
         // Arrange
         _mockCurrentUserService.Setup(s => s.IsAuthenticated).Returns(true);
         var navMan = Services.GetRequiredService<NavigationManager>();
+        navMan.NavigateTo("/register");
 
         // Act
         var cut = Render<Register>();
@@ -56,7 +57,7 @@ public class RegisterComponentTests : BunitContext
         // Assert
         var header = cut.Find("h3");
         Assert.Equal("Create an Account", header.TextContent);
-        
+
         // Assert the form fields exist
         var inputs = cut.FindAll("input");
         Assert.Equal(3, inputs.Count); // Username, Email, Password

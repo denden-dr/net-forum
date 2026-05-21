@@ -142,9 +142,7 @@ public class DevCurrentUserService : ICurrentUserService, IDisposable
             if (context != null)
             {
                 var path = context.Request.Path.Value ?? "";
-                if (path.StartsWith("/login", StringComparison.OrdinalIgnoreCase) || 
-                    path.StartsWith("/register", StringComparison.OrdinalIgnoreCase) ||
-                    path.StartsWith("/api/auth", StringComparison.OrdinalIgnoreCase))
+                if (IsAuthPath(path))
                 {
                     return user?.Identity?.IsAuthenticated ?? false;
                 }
@@ -156,22 +154,36 @@ public class DevCurrentUserService : ICurrentUserService, IDisposable
                 {
                     var uri = new Uri(_navigationManager.Uri);
                     var path = uri.AbsolutePath;
-                    if (path.StartsWith("/login", StringComparison.OrdinalIgnoreCase) || 
-                        path.StartsWith("/register", StringComparison.OrdinalIgnoreCase) ||
-                        path.StartsWith("/api/auth", StringComparison.OrdinalIgnoreCase))
+                    if (IsAuthPath(path))
                     {
                         return user?.Identity?.IsAuthenticated ?? false;
                     }
                 }
-                catch
+                catch (UriFormatException ex)
                 {
-                    // Ignore URI parsing issues in test environments
+                    _logger.LogDebug(ex, "Failed to parse navigation manager URI in DevCurrentUserService.");
                 }
             }
 
             return user?.Identity?.IsAuthenticated ?? true;
         }
         set => TestIsAuthenticated = value;
+    }
+
+    private static bool IsAuthPath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return false;
+
+        var normalized = path.TrimEnd('/');
+        if (!normalized.StartsWith('/'))
+        {
+            normalized = "/" + normalized;
+        }
+
+        return normalized.Equals("/login", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals("/register", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals("/api/auth", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("/api/auth/", StringComparison.OrdinalIgnoreCase);
     }
 
     private ClaimsPrincipal? GetPrincipal()

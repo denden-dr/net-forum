@@ -63,10 +63,10 @@ net-forum/                       # Repository Root
 
 We provide a comprehensive **Makefile** to automate local dependencies. Ensure you have **Podman** (or Docker) and the **.NET 10 SDK** installed.
 
-### 1. Boot up the Development Database
-Start a local PostgreSQL 18 container in the background:
+### 1. Boot up the Development Dependencies
+Start local PostgreSQL 18 and MinIO (S3 storage) containers in the background:
 ```bash
-make db-start
+make compose-up
 ```
 
 ### 2. Apply Schema Migrations
@@ -75,7 +75,7 @@ Create your database tables:
 make migration-update
 ```
 
-### 3. Run the Automated Tests (47 Tests!)
+### 3. Run the Automated Tests (76 Tests!)
 Verify all unit, component, and Postgres integration tests are passing using our fast Makefile targets:
 * **Run everything (Unit + Integration):**
   ```bash

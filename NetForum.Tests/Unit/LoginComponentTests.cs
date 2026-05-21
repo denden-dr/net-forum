@@ -114,6 +114,7 @@ public class LoginComponentTests : BunitContext
         Services.AddSingleton(mockCurrentUserService.Object);
 
         var navMan = Services.GetRequiredService<NavigationManager>();
+        navMan.NavigateTo("/login");
 
         // Act
         var cut = Render<Login>();

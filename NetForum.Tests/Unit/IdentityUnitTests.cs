@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components;
 using NetForum.Data;
 using NetForum.Data.Entities;
 using NetForum.Services;
@@ -55,4 +56,85 @@ public class IdentityUnitTests
         Assert.Equal(Roles.Member, devService.Role);
         Assert.True(devService.IsAuthenticated);
     }
+
+    private class TestNavManager : NavigationManager
+    {
+        public TestNavManager(string baseUri, string uri)
+        {
+            Initialize(baseUri, uri);
+        }
+    }
+
+    [Fact]
+    public void DevCurrentUserService_WhenPathIsLoginOrRegister_DoesNotApplyDevFallback()
+    {
+        // Arrange
+        var mockHttpContextAccessor = new Moq.Mock<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
+        var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        context.Request.Path = "/login";
+        mockHttpContextAccessor.Setup(h => h.HttpContext).Returns(context);
+
+        var devService = new DevCurrentUserService(
+            null!, // authStateProvider
+            mockHttpContextAccessor.Object,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<DevCurrentUserService>.Instance,
+            null // navigationManager
+        );
+
+        // Assert
+        Assert.False(devService.IsAuthenticated);
+    }
+
+    [Fact]
+    public void DevCurrentUserService_WhenPathIsUnrelatedPrefix_AppliesDevFallback()
+    {
+        // Arrange
+        var mockHttpContextAccessor = new Moq.Mock<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
+        var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        context.Request.Path = "/login-help";
+        mockHttpContextAccessor.Setup(h => h.HttpContext).Returns(context);
+
+        var devService = new DevCurrentUserService(
+            null!, // authStateProvider
+            mockHttpContextAccessor.Object,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<DevCurrentUserService>.Instance,
+            null // navigationManager
+        );
+
+        // Assert
+        Assert.True(devService.IsAuthenticated);
+    }
+
+    [Fact]
+    public void DevCurrentUserService_WhenNavUriIsLoginOrRegister_DoesNotApplyDevFallback()
+    {
+        // Arrange
+        var navManager = new TestNavManager("http://localhost/", "http://localhost/login");
+        var devService = new DevCurrentUserService(
+            null!,
+            null!,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<DevCurrentUserService>.Instance,
+            navManager
+        );
+
+        // Assert
+        Assert.False(devService.IsAuthenticated);
+    }
+
+    [Fact]
+    public void DevCurrentUserService_WhenNavUriIsUnrelatedPrefix_AppliesDevFallback()
+    {
+        // Arrange
+        var navManager = new TestNavManager("http://localhost/", "http://localhost/login-help");
+        var devService = new DevCurrentUserService(
+            null!,
+            null!,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<DevCurrentUserService>.Instance,
+            navManager
+        );
+
+        // Assert
+        Assert.True(devService.IsAuthenticated);
+    }
 }
+
